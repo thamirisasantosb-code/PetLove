@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Consulta Petlove</title>
+  <style>
+    :root{color-scheme:light;--bg:#f4f6f9;--card:#ffffff;--line:#e2e8f0;--text:#2d3748;--muted:#718096;--accent:#5e2a84;--secondary:#ef4154;}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.5 'Inter',system-ui,sans-serif;}
+    main{width:min(1300px,94%);margin:30px auto;}
+    .corporate-header { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--line); padding: 25px 35px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(94, 42, 132, 0.06); flex-wrap: wrap; gap: 20px;}
+    .nav { display: flex; gap: 15px; margin-bottom: 20px; }
+    .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
+    .nav a:hover { background: var(--line); }
+    .nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .corporate-header .logos { display: flex; align-items: center; }
+    .corporate-header .jm-logo { height: 60px; object-fit: contain; }
+    .corporate-header .title-area { text-align: right; }
+    .title-area h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
+    .title-area p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 500;}
+    
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(94, 42, 132, 0.05)}
+    form{display:grid;grid-template-columns: 1fr 1fr auto auto;gap:16px;align-items:end} label{display:grid;gap:8px;color:var(--text);font-size:13px;font-weight:700}
+    input{width:100%;padding:13px 15px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-size:14px;outline:none;transition: border-color 0.2s, box-shadow 0.2s;} input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94, 42, 132, 0.15)}
+    button,.download{border:0;border-radius:10px;padding:14px 22px;background:var(--accent);color:#ffffff;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;transition:transform 0.1s, filter 0.2s;} button:disabled{opacity:.55;cursor:wait}
+    .secondary{background:var(--line);color:var(--text);border:1px solid #cbd5e0;} button:hover:not(:disabled),.download:hover{filter:brightness(1.1); transform:translateY(-1px);}
+    #status{min-height:24px;margin:18px 2px;color:var(--muted);font-weight:500;} #status.erro{color:var(--secondary)}.toolbar{display:flex;justify-content:space-between;align-items:center;margin:20px 0 16px;gap:12px}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;margin-bottom:24px;max-height:65vh;} table{width:100%;border-collapse:collapse;background:var(--card)}
+    th,td{padding:12px 15px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:14px;} th{position:sticky;top:0;background:#f8f9fa;font-weight:700;color:var(--accent);z-index:1} tr:hover td{background:rgba(94,42,132,0.03)}.hidden{display:none}
+    @media(max-width:850px){form{grid-template-columns:1fr}button{width:100%}.corporate-header{flex-direction:column; text-align:center;} .corporate-header .title-area{text-align:center;}}
+  </style>
+</head>
+<body><main>
+  <div class="nav" style="justify-content: space-between;">
+    <div style="display:flex; gap:15px; overflow-x:auto; white-space:nowrap; padding-bottom:5px;">
+      <a href="/" class="active">Consulta TMSLOG</a>
+      <a href="/nova-acareacao">Nova Acareação</a>
+      <a href="/gestao">Gestão de Solicitações</a>
+      {% if perfil == 'Admin' %}
+      <a href="/dashboard">Dashboard</a>
+      {% endif %}
+    </div>
+    <div style="display:flex; gap:15px; align-items:center;">
+      <span style="font-size:13px; font-weight:bold; color:var(--muted)">Olá, {{ usuario }} ({{ perfil }})</span>
+      <a href="/logout" style="background:var(--secondary); color:#fff; border-color:var(--secondary)">Sair</a>
+    </div>
+  </div>
+
+  <header class="corporate-header">
+    <div class="logos">
+      <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'display:flex;align-items:center;font-weight:900;font-size:42px;color:var(--accent);letter-spacing:-2px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:24px;margin-left:4px;margin-top:-14px;\'>TD</span></div>'">
+    </div>
+    <div class="title-area">
+      <h1>Portal TMSLOG</h1>
+      <p>Gerenciador Automático de Entregas</p>
+    </div>
+  </header>
+  <section class="card">
+    <form id="form">
+      <label>Número do Pedido<input id="pedido" inputmode="numeric" pattern="[0-9]+" value="" placeholder="Ex: 123019451" required></label>
+      <label>Login<input id="login" type="email" value="{{ login_padrao }}" autocomplete="username" required></label>
+      <label>Senha<input id="senha" type="password" autocomplete="current-password" required><span><input id="mostrar-senha" type="checkbox" style="width:auto"> Mostrar senha</span></label>
+      <button id="botao" type="submit">Extrair dados</button>
+      <button id="abrir" class="secondary" type="button">Abrir no TMSLOG</button>
+    </form>
+    <div id="status" aria-live="polite"></div>
+  </section>
+  <section id="resultado" class="hidden"><div class="toolbar"><h2 id="titulo"></h2><a id="download" class="download">Baixar Excel</a></div><div id="tabelas"></div></section>
+</main><script>
+const $=s=>document.querySelector(s), escapeHtml=v=>{const e=document.createElement('span');e.textContent=v??'';return e.innerHTML};
+// O botão Abrir no TMSLOG será desativado até a pesquisa trazer o número da lista
+const urlTmslog=(idLista)=>`https://petlove.tmslog.com.br/Imp_ListaPet.aspx?id=${encodeURIComponent(idLista)}`;
+let listaEntregaAtual = '';
+
+$('#abrir').addEventListener('click',()=>{
+  if(!listaEntregaAtual){ alert('Faça a extração primeiro para descobrir o número da Lista.'); return; }
+  window.location.assign(urlTmslog(listaEntregaAtual));
+});
+
+$('#mostrar-senha').addEventListener('change',event=>{
+  $('#senha').type=event.target.checked?'text':'password';
+});
+
+// Carrega os dados salvos anteriormente (se existirem)
+window.addEventListener('DOMContentLoaded', () => {
+  const savedLogin = localStorage.getItem('petlove_login');
+  const savedSenha = localStorage.getItem('petlove_senha');
+  if (savedLogin) $('#login').value = savedLogin;
+  if (savedSenha) $('#senha').value = savedSenha;
+});
+
+$('#form').addEventListener('submit',async event=>{
+  event.preventDefault(); 
+  
+  // Salva o login e a senha no navegador para as próximas vezes
+  localStorage.setItem('petlove_login', $('#login').value);
+  localStorage.setItem('petlove_senha', $('#senha').value);
+  
+  const botao=$('#botao'),status=$('#status'); botao.disabled=true; status.className=''; status.textContent='Buscando dados e consultando o TMSLOG…'; $('#resultado').classList.add('hidden');
+  try{const response=await fetch('/consultar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedido:$('#pedido').value,login:$('#login').value,senha:$('#senha').value.trim()})});
+    const data=await response.json(); if(!response.ok)throw new Error(data.erro||'Falha na consulta.');
+    listaEntregaAtual = data.lista;
+    $('#titulo').textContent=`Pedido ${data.numero} (Lista ${data.lista})`; $('#download').href=data.download;
+    $('#tabelas').innerHTML=data.tabelas.map((linhas,i)=>`<h3>${escapeHtml(data.nomes_tabelas?.[i]||`Tabela ${i+1}`)}</h3><div class="table-wrap"><table><thead><tr>${linhas[0].map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${linhas.slice(1).map(l=>`<tr>${l.map(c=>`<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
+    status.textContent=`${data.tabelas.length} tabela(s) encontrada(s).`; $('#resultado').classList.remove('hidden');
+  }catch(error){status.className='erro';status.textContent=location.protocol==='file:'?'Abra esta tela pelo servidor: execute “py app.py” e acesse http://127.0.0.1:5000.':error.message}finally{botao.disabled=false}
+});
+</script></body></html>

@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    image: petlove-app:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - petlove-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  petlove-data:

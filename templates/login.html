@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Login - Petlove JM</title>
+  <style>
+    :root{color-scheme:light;--bg:#f4f6f9;--card:#ffffff;--line:#e2e8f0;--text:#2d3748;--muted:#718096;--accent:#5e2a84;--secondary:#ef4154;}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.5 'Inter',system-ui,sans-serif; display:flex; align-items:center; justify-content:center;}
+    .login-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 40px; box-shadow: 0 10px 40px rgba(94, 42, 132, 0.08); width: 100%; max-width: 400px; text-align: center; }
+    .logos { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+    .jm-logo { height: 60px; object-fit: contain; }
+    h1 { margin: 0 0 10px; font-size: 24px; color: var(--accent); }
+    p { margin: 0 0 25px; color: var(--muted); font-size: 14px; }
+    form { display: flex; flex-direction: column; gap: 15px; text-align: left; }
+    label { font-size: 13px; font-weight: 700; color: var(--text); }
+    input { width: 100%; padding: 12px 15px; border: 2px solid var(--line); border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15); }
+    button { border: 0; border-radius: 8px; padding: 14px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+    button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .erro { color: var(--secondary); background: #fef2f2; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-bottom: 15px; border: 1px solid #fecaca; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logos">
+      <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'font-weight:900;font-size:36px;color:var(--accent);letter-spacing:-1px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:20px;\'>TD</span></div>'">
+    </div>
+    <h1>Portal Petlove</h1>
+    <p>Faça login para gerenciar solicitações</p>
+    
+    {% if erro %}
+    <div class="erro">{{ erro }}</div>
+    {% endif %}
+
+    <form method="POST" id="form-login">
+      <label>E-mail
+        <input type="email" name="email" required placeholder="seu@email.com" autofocus>
+      </label>
+      <label>Senha
+        <input type="password" name="senha" required placeholder="••••••••">
+      </label>
+      <button type="submit">Entrar no Sistema</button>
+      <div style="margin-top:15px; text-align:center;">
+        <a href="javascript:void(0)" onclick="toggleForms()" style="color:var(--accent); font-size:13px; font-weight:bold; text-decoration:none;">Solicitar novo acesso</a>
+      </div>
+    </form>
+    
+    <form id="form-solicitar" style="display:none;" onsubmit="solicitarAcesso(event)">
+      <p style="color:var(--text); font-weight:bold; margin-bottom:15px;">Informe seu e-mail para criarmos sua conta.</p>
+      <label>E-mail Corporativo
+        <input type="email" id="email-solicitar" required placeholder="seu@email.com">
+      </label>
+      <button type="submit" id="btn-solicitar" style="background:#38a169;">Gerar e Enviar Senha</button>
+      <div id="status-solicitar" style="margin-top:15px; font-weight:bold; font-size:14px; padding:10px; border-radius:8px; display:none;"></div>
+      <div style="margin-top:15px; text-align:center;">
+        <a href="javascript:void(0)" onclick="toggleForms()" style="color:var(--muted); font-size:13px; text-decoration:none;">Voltar para o Login</a>
+      </div>
+    </form>
+  </div>
+  
+  <script>
+    function toggleForms() {
+      const login = document.getElementById('form-login');
+      const solicitar = document.getElementById('form-solicitar');
+      const err = document.querySelector('.erro');
+      if (err) err.style.display = 'none';
+      
+      if (login.style.display === 'none') {
+        login.style.display = 'flex';
+        solicitar.style.display = 'none';
+      } else {
+        login.style.display = 'none';
+        solicitar.style.display = 'flex';
+        document.getElementById('status-solicitar').style.display = 'none';
+      }
+    }
+    
+    async function solicitarAcesso(e) {
+      e.preventDefault();
+      const email = document.getElementById('email-solicitar').value;
+      const btn = document.getElementById('btn-solicitar');
+      const status = document.getElementById('status-solicitar');
+      
+      btn.disabled = true;
+      btn.textContent = 'Gerando...';
+      status.style.display = 'none';
+      
+      try {
+        const response = await fetch('/api/solicitar-acesso', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email: email})
+        });
+        const data = await response.json();
+        
+        status.style.display = 'block';
+        if (!response.ok) {
+          status.style.background = '#fef2f2';
+          status.style.color = 'var(--secondary)';
+          status.style.border = '1px solid #fecaca';
+          status.textContent = data.erro || 'Erro ao solicitar acesso.';
+        } else {
+          status.style.background = '#f0fff4';
+          status.style.color = '#22543d';
+          status.style.border = '1px solid #c6f6d5';
+          status.innerHTML = `✅ Conta criada com sucesso!<br>Sua senha gerada é: <span style="font-size:18px; color:var(--accent); display:block; margin-top:5px; padding:5px; background:#fff; border-radius:5px; border:1px solid #ccc;">${data.senha}</span> Copie esta senha e faça login!`;
+          btn.style.display = 'none';
+          document.getElementById('email-solicitar').disabled = true;
+        }
+      } catch (err) {
+        status.style.display = 'block';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gerar e Enviar Senha';
+      }
+    }
+  </script>
+</body>
+</html>

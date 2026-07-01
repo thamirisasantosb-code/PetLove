@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gestão de Acareações Petlove</title>
+  <style>
+    :root{color-scheme:light;--bg:#f4f6f9;--card:#ffffff;--line:#e2e8f0;--text:#2d3748;--muted:#718096;--accent:#5e2a84;--secondary:#ef4154;}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.5 'Inter',system-ui,sans-serif;}
+    main{width:min(1400px,96%);margin:30px auto;}
+    .nav { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
+    .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
+    .nav a:hover { background: var(--line); }
+    .nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    
+    .corporate-header { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--line); padding: 25px 35px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(94, 42, 132, 0.06); flex-wrap: wrap; gap: 20px;}
+    .corporate-header .logos { display: flex; align-items: center; }
+    .corporate-header .jm-logo { height: 60px; object-fit: contain; }
+    .corporate-header .title-area { text-align: right; }
+    .title-area h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
+    .title-area p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 500;}
+    
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(94, 42, 132, 0.05); margin-bottom: 20px;}
+    
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh;} 
+    table{width:100%;border-collapse:collapse;background:var(--card)}
+    th,td{padding:14px 15px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:13px;} 
+    th{position:sticky;top:0;background:#f8f9fa;font-weight:700;color:var(--accent);z-index:1} 
+    tr:hover td{background:rgba(94,42,132,0.03)}
+    
+    .btn-analisar { border: none; background: var(--accent); color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 12px; display: inline-block; cursor: pointer; transition: 0.2s; }
+    .btn-analisar:hover { background: var(--secondary); }
+    .btn-finalizada { border: none; background: #4CAF50; color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 12px; display: inline-block; cursor: pointer; transition: 0.2s; }
+    .btn-finalizada:hover { background: #45a049; }
+    
+    .status-badge { padding: 4px 8px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .status-pendente { background: #edf2f7; color: #4a5568; }
+    .status-procedente { background: #c6f6d5; color: #22543d; }
+    .status-nao-procedente { background: #fed7d7; color: #822727; }
+
+    .filters-container { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filters-container input, .filters-container select { padding: 10px 15px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; outline: none; transition: 0.2s; flex: 1; min-width: 150px; }
+    .filters-container input:focus, .filters-container select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15); }
+
+    #status{min-height:24px;margin-top:15px;color:var(--muted);font-weight:500;}
+  </style>
+</head>
+<body>
+
+<div id="toast-success" style="display:none; position:fixed; top:20px; right:20px; background:#4CAF50; color:white; padding:15px 25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); z-index:9999; font-weight:bold; font-size:14px; animation: fadeInOut 3.5s forwards;">
+  ✅ Solicitação salva com sucesso!
+</div>
+<style>
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-20px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+  }
+</style>
+
+<main>
+  <div class="nav" style="justify-content: space-between;">
+    <div style="display:flex; gap:15px; overflow-x:auto; white-space:nowrap; padding-bottom:5px;">
+      <a href="/">Consulta TMSLOG</a>
+      <a href="/nova-acareacao">Nova Acareação</a>
+      <a href="/gestao" class="active">Gestão de Solicitações</a>
+      {% if perfil == 'Admin' %}
+      <a href="/dashboard">Dashboard</a>
+      {% endif %}
+    </div>
+    <div style="display:flex; gap:15px; align-items:center;">
+      <span style="font-size:13px; font-weight:bold; color:var(--muted)">Olá, {{ usuario }} ({{ perfil }})</span>
+      <a href="/logout" style="background:var(--secondary); color:#fff; border-color:var(--secondary)">Sair</a>
+    </div>
+  </div>
+
+  <header class="corporate-header">
+    <div class="logos">
+      <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'display:flex;align-items:center;font-weight:900;font-size:42px;color:var(--accent);letter-spacing:-2px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:24px;margin-left:4px;margin-top:-14px;\'>TD</span></div>'">
+    </div>
+    <div class="title-area">
+      <h1>Gestão de Acareações</h1>
+      <p>Acompanhamento e Listagem Geral</p>
+    </div>
+  </header>
+
+  <section class="card">
+    <div id="status">Carregando dados...</div>
+    
+    <div class="filters-container">
+      <input type="text" id="filtro-id" placeholder="Filtrar por ID do Pedido...">
+      <select id="filtro-status">
+        <option value="">Todos os Status</option>
+        <option value="Pendente">Pendente</option>
+        <option value="Procedente">Procedente</option>
+        <option value="Não Proc">Não Procedente</option>
+      </select>
+      {% if perfil == 'Admin' %}
+      <input type="text" id="filtro-criador" placeholder="Filtrar por Criador...">
+      {% endif %}
+      <input type="text" id="filtro-motorista" placeholder="Filtrar por Motorista...">
+    </div>
+
+    <div class="table-wrap">
+      <table id="tabela-dados">
+        <thead>
+          <tr>
+            <th>Ação</th>
+            <th>ID Pedido</th>
+            <th>Status</th>
+            <th>Criado por</th>
+            <th>Motorista</th>
+            <th>Data Rec.</th>
+            <th>Valor</th>
+            <th>Justificativa</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+</main><script>
+const $ = s => document.querySelector(s);
+window.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('salvo') === '1') {
+      const toast = document.getElementById('toast-success');
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3500);
+      window.history.replaceState({}, document.title, "/gestao");
+  }
+
+  const tbody = $('#tabela-dados tbody');
+  const status = $('#status');
+  try {
+    const response = await fetch('/api/fluxo/todos');
+    const dados = await response.json();
+    if (!response.ok) throw new Error(dados.erro || 'Falha ao buscar os dados.');
+    
+    if (dados.length === 0) {
+      status.textContent = 'Nenhuma solicitação encontrada na base de dados.';
+      return;
+    }
+    
+    // Reverse so newest are typically at top
+    dados.reverse().forEach(linha => {
+      const tr = document.createElement('tr');
+      
+      const proc = (linha['Procedência'] || '').trim();
+      const responsavel = (linha['Responsavel'] || '').trim();
+      
+      let badgeClass = 'status-pendente';
+      let badgeText = 'Pendente';
+      
+      if (responsavel !== '') {
+        if (proc === 'Procedente') { 
+            badgeClass = 'status-procedente'; 
+            badgeText = 'Procedente'; 
+        } else if (proc === 'Não Procedente' || proc === 'Nao Procedente') { 
+            badgeClass = 'status-nao-procedente'; 
+            badgeText = 'Não Proc.'; 
+        } else {
+            badgeClass = 'status-procedente';
+            badgeText = proc !== '' ? proc : 'Finalizado';
+        }
+      }
+      
+      let actionText = responsavel !== '' ? 'Finalizada' : 'Analisar';
+      let actionClass = responsavel !== '' ? 'btn-finalizada' : 'btn-analisar';
+      
+      const id_pedido = linha['ID_do_Pedido'] || '';
+      const justif = (linha['Justificativa'] || '').substring(0, 40) + ((linha['Justificativa'] || '').length > 40 ? '...' : '');
+
+      let actionLink = responsavel !== '' ? 'javascript:void(0);' : `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
+      let actionStyle = responsavel !== '' ? 'cursor: not-allowed; opacity: 0.8;' : '';
+
+      tr.innerHTML = `
+        <td><a href="${actionLink}" class="${actionClass}" style="${actionStyle}">${actionText}</a></td>
+        <td style="font-weight:bold;">${id_pedido}</td>
+        <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+        <td>${linha['Criado por'] || ''}</td>
+        <td>${linha['Motorista'] || ''}</td>
+        <td>${linha['Descrição da Reclamação'] || ''}</td>
+        <td>${linha['Valor'] || ''}</td>
+        <td title="${linha['Justificativa']}">${justif}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    
+    status.style.display = 'none';
+
+    // Configuração dos Filtros
+    const idFilter = document.getElementById('filtro-id');
+    const statusFilter = document.getElementById('filtro-status');
+    const criadorFilter = document.getElementById('filtro-criador');
+    const motoristaFilter = document.getElementById('filtro-motorista');
+
+    function aplicarFiltros() {
+      const idVal = idFilter ? idFilter.value.toLowerCase() : '';
+      const statusVal = statusFilter ? statusFilter.value.toLowerCase() : '';
+      const criadorVal = criadorFilter ? criadorFilter.value.toLowerCase() : '';
+      const motoristaVal = motoristaFilter ? motoristaFilter.value.toLowerCase() : '';
+
+      const rows = tbody.querySelectorAll('tr');
+      rows.forEach(row => {
+        const idText = row.cells[1].textContent.toLowerCase();
+        const statusText = row.cells[2].textContent.toLowerCase();
+        const criadorText = row.cells[3].textContent.toLowerCase();
+        const motoristaText = row.cells[4].textContent.toLowerCase();
+
+        const matchId = idText.includes(idVal);
+        const matchStatus = statusVal === '' || statusText.includes(statusVal);
+        const matchCriador = criadorText.includes(criadorVal);
+        const matchMotorista = motoristaText.includes(motoristaVal);
+
+        if (matchId && matchStatus && matchCriador && matchMotorista) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    }
+
+    if(idFilter) idFilter.addEventListener('input', aplicarFiltros);
+    if(statusFilter) statusFilter.addEventListener('change', aplicarFiltros);
+    if(criadorFilter) criadorFilter.addEventListener('input', aplicarFiltros);
+    if(motoristaFilter) motoristaFilter.addEventListener('input', aplicarFiltros);
+
+  } catch (error) {
+    status.style.color = 'var(--secondary)';
+    status.textContent = error.message;
+  }
+});
+</script></body></html>
