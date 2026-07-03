@@ -44,7 +44,12 @@
 
     #status{min-height:24px;margin-top:15px;color:var(--muted);font-weight:500;}
     .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 25px; }
-    .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.04); display: flex; flex-direction: column; }
+    .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.04); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(94, 42, 132, 0.08); }
+    .stat-card:active { transform: translateY(0); }
+    .stat-card.active-card { box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.35), 0 8px 30px rgba(94, 42, 132, 0.08); transform: translateY(-2px); }
+    .stat-card.pending-card.active-card { box-shadow: 0 0 0 3px rgba(239, 65, 84, 0.35), 0 8px 30px rgba(239, 65, 84, 0.08); transform: translateY(-2px); }
+    .stat-card.success-card.active-card { box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.35), 0 8px 30px rgba(76, 175, 80, 0.08); transform: translateY(-2px); }
     .stat-card .label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .stat-card .value { font-size: 32px; font-weight: 800; color: var(--accent); }
     .stat-card.pending-card { border-left: 5px solid var(--secondary); }
@@ -95,15 +100,15 @@
 
   <!-- Resumo de Solicitações (Cards de Estatísticas) -->
   <div class="stats-container">
-    <div class="stat-card">
+    <div class="stat-card" id="card-total">
       <span class="label">Total de Solicitações</span>
       <span class="value" id="stat-total">0</span>
     </div>
-    <div class="stat-card pending-card">
+    <div class="stat-card pending-card" id="card-pendentes">
       <span class="label">Aguardando Análise (Não Finalizados)</span>
       <span class="value" id="stat-pendentes">0</span>
     </div>
-    <div class="stat-card success-card">
+    <div class="stat-card success-card" id="card-finalizados">
       <span class="label">Solicitações Finalizadas</span>
       <span class="value" id="stat-finalizados">0</span>
     </div>
@@ -229,6 +234,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     const criadorFilter = document.getElementById('filtro-criador');
     const motoristaFilter = document.getElementById('filtro-motorista');
 
+    let filtroCardStatus = 'todos'; // 'todos', 'pendentes', 'finalizados'
+
     function aplicarFiltros() {
       const idVal = idFilter ? idFilter.value.toLowerCase() : '';
       const statusVal = statusFilter ? statusFilter.value.toLowerCase() : '';
@@ -244,6 +251,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const statusText = row.cells[2].textContent.toLowerCase();
         const criadorText = row.cells[3].textContent.toLowerCase();
         const motoristaText = row.cells[4].textContent.toLowerCase();
+        const actionText = row.cells[0].textContent.trim();
 
         const matchId = idText.includes(idVal);
         const matchStatus = statusVal === '' || statusText.includes(statusVal);
@@ -251,11 +259,23 @@ window.addEventListener('DOMContentLoaded', async () => {
         const matchMotorista = motoristaText.includes(motoristaVal);
 
         if (matchId && matchStatus && matchCriador && matchMotorista) {
-          row.style.display = '';
           totalFiltrado++;
-          const actionText = row.cells[0].textContent;
           if (actionText === 'Analisar') {
             pendentesFiltrados++;
+          }
+
+          // Aplicar filtro de card
+          let matchCard = true;
+          if (filtroCardStatus === 'pendentes') {
+            matchCard = (actionText === 'Analisar');
+          } else if (filtroCardStatus === 'finalizados') {
+            matchCard = (actionText === 'Finalizada');
+          }
+
+          if (matchCard) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
           }
         } else {
           row.style.display = 'none';
@@ -271,6 +291,42 @@ window.addEventListener('DOMContentLoaded', async () => {
     if(statusFilter) statusFilter.addEventListener('change', aplicarFiltros);
     if(criadorFilter) criadorFilter.addEventListener('input', aplicarFiltros);
     if(motoristaFilter) motoristaFilter.addEventListener('input', aplicarFiltros);
+
+    // Eventos de clique nos cards de estatísticas
+    const cardTotal = document.getElementById('card-total');
+    const cardPendentes = document.getElementById('card-pendentes');
+    const cardFinalizados = document.getElementById('card-finalizados');
+
+    function destacarCardAtivo() {
+      cardTotal.classList.remove('active-card');
+      cardPendentes.classList.remove('active-card');
+      cardFinalizados.classList.remove('active-card');
+
+      if (filtroCardStatus === 'todos') cardTotal.classList.add('active-card');
+      else if (filtroCardStatus === 'pendentes') cardPendentes.classList.add('active-card');
+      else if (filtroCardStatus === 'finalizados') cardFinalizados.classList.add('active-card');
+    }
+
+    cardTotal.addEventListener('click', () => {
+      filtroCardStatus = 'todos';
+      destacarCardAtivo();
+      aplicarFiltros();
+    });
+
+    cardPendentes.addEventListener('click', () => {
+      filtroCardStatus = 'pendentes';
+      destacarCardAtivo();
+      aplicarFiltros();
+    });
+
+    cardFinalizados.addEventListener('click', () => {
+      filtroCardStatus = 'finalizados';
+      destacarCardAtivo();
+      aplicarFiltros();
+    });
+
+    // Ativar destaque inicial
+    destacarCardAtivo();
 
   } catch (error) {
     status.style.color = 'var(--secondary)';
