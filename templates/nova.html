@@ -128,4 +128,39 @@ $('#form-novo').addEventListener('submit', async event => {
     setTimeout(() => { if(status.className === 'sucesso') status.textContent = ''; }, 4000);
   }
 });
+
+// Logica de Autocompletar ao digitar/colar o ID do Pedido
+const idPedidoInput = $('#ID_do_Pedido');
+if (idPedidoInput) {
+  const triggerAuto = async () => {
+    const pedido = idPedidoInput.value.trim();
+    if (!pedido || pedido.length < 5) return;
+    
+    const status = $('#status');
+    status.className = '';
+    status.textContent = 'Buscando informacoes do pedido nas bases...';
+    
+    try {
+      const response = await fetch(`/api/fluxo/autocompletar/${pedido}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.erro || 'Erro ao buscar dados.');
+      
+      if (data.Motorista) $('#Motorista').value = data.Motorista;
+      if (data.Placa_do_veiculo) $('#Placa_do_veiculo').value = data.Placa_do_veiculo;
+      if (data.Rota) $('#Rota').value = data.Rota;
+      if (data.Regional_2) $('#Regional_2').value = data.Regional_2;
+      if (data.Valor) $('#Valor').value = data.Valor;
+      if (data.Data_do_Carregamento) $('#Data_do_Carregamento').value = data.Data_do_Carregamento;
+      
+      status.textContent = '';
+    } catch (err) {
+      status.className = 'erro';
+      status.textContent = 'Erro ao autocompletar dados: ' + err.message;
+      setTimeout(() => { if (status.className === 'erro') status.textContent = ''; }, 4000);
+    }
+  };
+  
+  idPedidoInput.addEventListener('change', triggerAuto);
+  idPedidoInput.addEventListener('blur', triggerAuto);
+}
 </script></body></html>

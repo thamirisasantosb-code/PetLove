@@ -391,6 +391,124 @@ def fluxo_atualizar_romaneio():
     except Exception as e:
         return jsonify(erro=str(e)), 500
 
+def formatar_data_para_iso(dt_str):
+    dt_str = str(dt_str).strip()
+    if "/" in dt_str:
+        partes = dt_str.split("/")
+        if len(partes) == 3:
+            d, m, y = partes
+            if len(d) <= 2 and len(m) <= 2 and len(y) == 4:
+                return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+    return dt_str
+
+@app.get("/api/fluxo/autocompletar/<pedido>")
+@login_required
+def fluxo_autocompletar(pedido):
+    pedido = str(pedido).strip()
+    resultado = {
+        "Motorista": "",
+        "Placa_do_veiculo": "",
+        "Rota": "",
+        "Regional_2": "",
+        "Valor": "",
+        "Data_do_Carregamento": ""
+    }
+    
+    # 1. Buscar no banco SQLite
+    try:
+        conn = get_db_connection()
+        row = conn.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,)).fetchone()
+        conn.close()
+        if row:
+            colunas = row.keys() if hasattr(row, 'keys') else []
+            col_mot = next((c for c in colunas if 'Motorista' in c), 'Motorista')
+            col_placa = next((c for c in colunas if 'Placa' in c), 'Placa_do_veículo')
+            col_rota = next((c for c in colunas if 'Rota' in c), 'Rota')
+            col_reg = next((c for c in colunas if 'Regional' in c), 'Regional_2')
+            col_val = next((c for c in colunas if 'Valor' in c), 'Valor')
+            col_data = next((c for c in colunas if 'Data' in c), 'Data_do_Carregamento')
+            
+            if row[col_mot]: resultado["Motorista"] = str(row[col_mot]).strip()
+            if row[col_placa]: resultado["Placa_do_veiculo"] = str(row[col_placa]).strip()
+            if row[col_rota]: resultado["Rota"] = str(row[col_rota]).strip()
+            if row[col_reg]: resultado["Regional_2"] = str(row[col_reg]).strip()
+            if row[col_val]: resultado["Valor"] = str(row[col_val]).strip()
+            if row[col_data]: resultado["Data_do_Carregamento"] = formatar_data_para_iso(row[col_data])
+            
+            if resultado["Motorista"] and resultado["Placa_do_veiculo"]:
+                return jsonify(resultado)
+    except:
+        pass
+
+    # 2. Buscar no Gestão de Perdas -Pet Love.csv
+    try:
+        csv_perdas = BASE_DADOS_DIR / "Fluxo de aprovação" / "Gestão de Perdas -Pet Love.csv"
+        if csv_perdas.exists():
+            delimiter = ','
+            with open(csv_perdas, newline='', encoding='utf-8-sig', errors='ignore') as f:
+                first_line = f.readline()
+                if first_line.count(';') > first_line.count(','):
+                    delimiter = ';'
+                f.seek(0)
+                reader = csv.DictReader(f, delimiter=delimiter)
+                for row in reader:
+                    col_id = next((c for c in reader.fieldnames if 'ID_do_Pedido' in c or 'ID_Pedido' in c), 'ID_do_Pedido')
+                    if str(row.get(col_id, "")).strip() == pedido:
+                        col_mot = next((c for c in reader.fieldnames if 'Motorista' in c), 'Motorista')
+                        col_placa = next((c for c in reader.fieldnames if 'Placa' in c), 'Placa do veículo')
+                        col_rota = next((c for c in reader.fieldnames if 'Rota' in c), 'Rota')
+                        col_reg = next((c for c in reader.fieldnames if 'Regional' in c), 'Regional_2')
+                        col_val = next((c for c in reader.fieldnames if 'Valor' in c), 'Valor')
+                        col_data = next((c for c in reader.fieldnames if 'Carregamento' in c or 'Data' in c), 'Data do Carregamento')
+                        
+                        if row.get(col_mot) and not resultado["Motorista"]: resultado["Motorista"] = str(row[col_mot]).strip()
+                        if row.get(col_placa) and not resultado["Placa_do_veiculo"]: resultado["Placa_do_veiculo"] = str(row[col_placa]).strip()
+                        if row.get(col_rota) and not resultado["Rota"]: resultado["Rota"] = str(row[col_rota]).strip()
+                        if row.get(col_reg) and not resultado["Regional_2"]: resultado["Regional_2"] = str(row[col_reg]).strip()
+                        if row.get(col_val) and not resultado["Valor"]: resultado["Valor"] = str(row[col_val]).strip()
+                        if row.get(col_data) and not resultado["Data_do_Carregamento"]: resultado["Data_do_Carregamento"] = formatar_data_para_iso(row[col_data])
+                        break
+    except:
+        pass
+
+    # 3. Buscar no Relatorio TMS.csv
+    try:
+        csv_tms = BASE_DADOS_DIR / "Relatorio TMS.csv"
+        if csv_tms.exists():
+            delimiter = ','
+            with open(csv_tms, newline='', encoding='utf-8-sig', errors='ignore') as f:
+                first_line = f.readline()
+                if first_line.count(';') > first_line.count(','):
+                    delimiter = ';'
+                f.seek(0)
+                reader = csv.DictReader(f, delimiter=delimiter)
+                for row in reader:
+                    col_id = next((c for c in reader.fieldnames if 'Pedido' in c), 'Pedido')
+                    if str(row.get(col_id, "")).strip() == pedido:
+                        col_mot = next((c for c in reader.fieldnames if 'Motorista' in c), 'Motorista_Lista')
+                        col_rota = next((c for c in reader.fieldnames if 'Rota' in c), 'Rota_Entrega')
+                        col_reg = next((c for c in reader.fieldnames if 'Filial' in c), 'Filial_Entrega')
+                        col_data = next((c for c in reader.fieldnames if 'Carregamento' in c), 'Data_do_Carregamento_Lista')
+                        
+                        if row.get(col_mot) and not resultado["Motorista"]: resultado["Motorista"] = str(row[col_mot]).strip()
+                        if row.get(col_rota) and not resultado["Rota"]: resultado["Rota"] = str(row[col_rota]).strip()
+                        
+                        if row.get(col_reg) and not resultado["Regional_2"]: 
+                            reg_raw = str(row[col_reg]).strip()
+                            if "São Paulo" in reg_raw: resultado["Regional_2"] = "JM SP"
+                            elif "Barueri" in reg_raw: resultado["Regional_2"] = "JM BAR"
+                            elif "Santos" in reg_raw: resultado["Regional_2"] = "JM SSZ"
+                            else: resultado["Regional_2"] = reg_raw
+                            
+                        if row.get(col_data) and not resultado["Data_do_Carregamento"]:
+                            dt = str(row[col_data]).strip()
+                            resultado["Data_do_Carregamento"] = formatar_data_para_iso(dt.split(" ")[0])
+                        break
+    except:
+        pass
+
+    return jsonify(resultado)
+
 @app.post("/api/fluxo/novo")
 @login_required
 def fluxo_novo():
