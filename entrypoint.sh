@@ -9,11 +9,14 @@ if [ ! -f /app/data/petlove.db ]; then
     cp /app/defaults/petlove.db /app/data/petlove.db
 fi
 
-# Se a pasta de Base de dados não existir no volume persistente, copia a padrão
-if [ ! -d "/app/data/Base de dados" ]; then
-    echo "Inicializando Base de dados no volume persistente..."
-    cp -r "/app/defaults/Base de dados" "/app/data/"
-fi
+# Sempre atualiza a Base de dados no volume persistente com os arquivos mais recentes do build
+echo "Sincronizando arquivos da Base de dados..."
+mkdir -p "/app/data/Base de dados"
+cp -r "/app/defaults/Base de dados/"* "/app/data/Base de dados/"
+
+# Executa a sincronizacao segura do banco de dados SQLite
+echo "Executando migracao/sincronizacao do banco de dados..."
+python sync_db.py
 
 # Executa o gunicorn
 echo "Iniciando Gunicorn..."
