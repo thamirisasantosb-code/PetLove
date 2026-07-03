@@ -173,7 +173,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Atualizar contagem inicial de estatísticas
     const totalInicial = dados.length;
-    const pendentesInicial = dados.filter(linha => !(linha['Responsavel'] || '').trim()).length;
+    const pendentesInicial = dados.filter(linha => !(linha['Responsavel'] || '').trim() && !(linha['Procedência'] || '').trim()).length;
     
     $('#stat-total').textContent = totalInicial;
     $('#stat-pendentes').textContent = pendentesInicial;
@@ -194,11 +194,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       let badgeClass = 'status-pendente';
       let badgeText = 'Pendente';
       
-      if (responsavel !== '') {
-        if (proc === 'Procedente') { 
+      if (responsavel !== '' || proc !== '') {
+        if (proc === 'Procedente' || proc === 'Procedente') { 
             badgeClass = 'status-procedente'; 
             badgeText = 'Procedente'; 
-        } else if (proc === 'Não Procedente' || proc === 'Nao Procedente') { 
+        } else if (proc === 'Não Procedente' || proc === 'Nao Procedente' || proc === 'Improcedente') { 
             badgeClass = 'status-nao-procedente'; 
             badgeText = 'Não Proc.'; 
         } else {
@@ -207,14 +207,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
       
-      let actionText = responsavel !== '' ? 'Finalizada' : 'Analisar';
-      let actionClass = responsavel !== '' ? 'btn-finalizada' : 'btn-analisar';
+      let actionText = (responsavel !== '' || proc !== '') ? 'Finalizada' : 'Analisar';
+      let actionClass = (responsavel !== '' || proc !== '') ? 'btn-finalizada' : 'btn-analisar';
       
       const id_pedido = linha['ID_do_Pedido'] || '';
       const justif = (linha['Justificativa'] || '').substring(0, 40) + ((linha['Justificativa'] || '').length > 40 ? '...' : '');
-
-      let actionLink = responsavel !== '' ? 'javascript:void(0);' : `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
-      let actionStyle = responsavel !== '' ? 'cursor: not-allowed; opacity: 0.8;' : '';
+ 
+      let actionLink = (responsavel !== '' || proc !== '') ? 'javascript:void(0);' : `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
+      let actionStyle = (responsavel !== '' || proc !== '') ? 'cursor: not-allowed; opacity: 0.8;' : '';
 
       tr.innerHTML = `
         <td><a href="${actionLink}" class="${actionClass}" style="${actionStyle}">${actionText}</a></td>
