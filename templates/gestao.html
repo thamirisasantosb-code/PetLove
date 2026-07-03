@@ -22,11 +22,14 @@
     
     .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(94, 42, 132, 0.05); margin-bottom: 20px;}
     
-    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh;} 
-    table{width:100%;border-collapse:collapse;background:var(--card)}
-    th,td{padding:14px 15px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:13px;} 
-    th{position:sticky;top:0;background:#f8f9fa;font-weight:700;color:var(--accent);z-index:1} 
-    tr:hover td{background:rgba(94,42,132,0.03)}
+    .table-wrap{overflow-y:auto;overflow-x:hidden;border:1px solid var(--line);border-radius:12px;max-height:70vh;} 
+    table{width:100%;border-collapse:collapse;background:var(--card);table-layout:fixed;}
+    th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;word-wrap:break-word;} 
+    th{position:sticky;top:0;background:#f8f9fa;font-weight:700;color:var(--accent);z-index:1;white-space:nowrap;} 
+    td{white-space:normal;word-break:break-word;}
+    tr.row-clicavel{cursor:pointer;transition:background 0.15s;}
+    tr.row-clicavel:hover td{background:rgba(94,42,132,0.06)}
+    .col-no-wrap{white-space:nowrap;}
     
     .btn-analisar { border: none; background: var(--accent); color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 12px; display: inline-block; cursor: pointer; transition: 0.2s; }
     .btn-analisar:hover { background: var(--secondary); }
@@ -134,17 +137,20 @@
       <button id="btn-limpar-filtros" class="btn-limpar">🧹 Limpar Filtros</button>
     </div>
 
+    <div style="font-size:12px; color:var(--muted); margin-bottom:12px; font-weight:bold; display:flex; align-items:center; gap:6px;">
+      💡 Dica: Dê um duplo clique em qualquer linha para abrir os detalhes e histórico da solicitação.
+    </div>
+
     <div class="table-wrap">
       <table id="tabela-dados">
         <thead>
           <tr>
-            <th>Ação</th>
-            <th>ID Pedido</th>
-            <th>Status</th>
-            <th>Criado por</th>
-            <th>Motorista</th>
-            <th>Data Rec.</th>
-            <th>Valor</th>
+            <th style="width: 100px;">ID Pedido</th>
+            <th style="width: 110px;">Status</th>
+            <th style="width: 180px;">Criado por</th>
+            <th style="width: 250px;">Motorista</th>
+            <th style="width: 100px;">Data Rec.</th>
+            <th style="width: 100px;">Valor</th>
             <th>Justificativa</th>
           </tr>
         </thead>
@@ -193,6 +199,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Reverse so newest are typically at top
     dados.reverse().forEach(linha => {
       const tr = document.createElement('tr');
+      tr.className = 'row-clicavel';
       
       const proc = (linha['Procedência'] || '').trim();
       const responsavel = (linha['Responsavel'] || '').trim();
@@ -216,23 +223,22 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
       
-      let actionText = estaFinalizado ? 'Finalizada' : 'Analisar';
-      let actionClass = estaFinalizado ? 'btn-finalizada' : 'btn-analisar';
+      tr.dataset.finalizado = estaFinalizado ? 'true' : 'false';
       
       const id_pedido = linha['ID_do_Pedido'] || '';
-      const justif = (linha['Justificativa'] || '').substring(0, 40) + ((linha['Justificativa'] || '').length > 40 ? '...' : '');
- 
-      let actionLink = estaFinalizado ? 'javascript:void(0);' : `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
-      let actionStyle = estaFinalizado ? 'cursor: not-allowed; opacity: 0.8;' : '';
+      const justif = (linha['Justificativa'] || '').substring(0, 80) + ((linha['Justificativa'] || '').length > 80 ? '...' : '');
+
+      tr.addEventListener('dblclick', () => {
+        window.location.href = `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
+      });
 
       tr.innerHTML = `
-        <td><a href="${actionLink}" class="${actionClass}" style="${actionStyle}">${actionText}</a></td>
-        <td style="font-weight:bold;">${id_pedido}</td>
-        <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+        <td class="col-no-wrap" style="font-weight:bold; color:var(--accent);">${id_pedido}</td>
+        <td class="col-no-wrap"><span class="status-badge ${badgeClass}">${badgeText}</span></td>
         <td>${linha['Criado por'] || ''}</td>
         <td>${linha['Motorista'] || ''}</td>
-        <td>${linha['Descrição da Reclamação'] || ''}</td>
-        <td>${linha['Valor'] || ''}</td>
+        <td class="col-no-wrap">${linha['Descrição da Reclamação'] || ''}</td>
+        <td class="col-no-wrap">${linha['Valor'] || ''}</td>
         <td title="${linha['Justificativa']}">${justif}</td>
       `;
       tbody.appendChild(tr);
@@ -259,11 +265,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       const rows = tbody.querySelectorAll('tr');
       rows.forEach(row => {
-        const idText = row.cells[1].textContent.toLowerCase();
-        const statusText = row.cells[2].textContent.toLowerCase();
-        const criadorText = row.cells[3].textContent.toLowerCase();
-        const motoristaText = row.cells[4].textContent.toLowerCase();
-        const actionText = row.cells[0].textContent.trim();
+        const idText = row.cells[0].textContent.toLowerCase();
+        const statusText = row.cells[1].textContent.toLowerCase();
+        const criadorText = row.cells[2].textContent.toLowerCase();
+        const motoristaText = row.cells[3].textContent.toLowerCase();
+        const estaFin = row.dataset.finalizado === 'true';
 
         const matchId = idText.includes(idVal);
         const matchStatus = statusVal === '' || statusText.includes(statusVal);
@@ -272,16 +278,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (matchId && matchStatus && matchCriador && matchMotorista) {
           totalFiltrado++;
-          if (actionText === 'Analisar') {
+          if (!estaFin) {
             pendentesFiltrados++;
           }
 
           // Aplicar filtro de card
           let matchCard = true;
           if (filtroCardStatus === 'pendentes') {
-            matchCard = (actionText === 'Analisar');
+            matchCard = !estaFin;
           } else if (filtroCardStatus === 'finalizados') {
-            matchCard = (actionText === 'Finalizada');
+            matchCard = estaFin;
           }
 
           if (matchCard) {
