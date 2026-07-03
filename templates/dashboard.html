@@ -243,7 +243,22 @@ window.addEventListener('DOMContentLoaded', async () => {
           borderRadius: 4
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display: true} }, scales: { x: { stacked: false }, y: { stacked: false } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: {display: true} },
+        scales: { x: { stacked: false }, y: { stacked: false } },
+        onClick: (event, activeElements) => {
+          if (activeElements && activeElements.length > 0) {
+            const index = activeElements[0].index;
+            const userLabel = usuLabels[index];
+            window.location.href = `/gestao?criador=${encodeURIComponent(userLabel)}&card_status=pendentes`;
+          }
+        },
+        onHover: (event, activeElements) => {
+          event.native.target.style.cursor = (activeElements && activeElements.length > 0) ? 'pointer' : 'default';
+        }
+      }
     });
 
     // Configuração da Exportação para Excel

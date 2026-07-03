@@ -346,6 +346,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Ativar destaque inicial
     destacarCardAtivo();
 
+    // Ler parametros da URL e aplicar filtros iniciais
+    const urlParams = new URLSearchParams(window.location.search);
+    const criadorParam = urlParams.get('criador');
+    const cardStatusParam = urlParams.get('card_status');
+    
+    if (criadorParam && criadorFilter) {
+      criadorFilter.value = criadorParam;
+    }
+    if (cardStatusParam) {
+      filtroCardStatus = cardStatusParam;
+      destacarCardAtivo();
+    }
+    
+    aplicarFiltros();
+
     // Evento de clique para limpar todos os filtros
     const btnLimpar = document.getElementById('btn-limpar-filtros');
     if (btnLimpar) {
