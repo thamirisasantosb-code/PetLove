@@ -16,6 +16,26 @@ def sync_db():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    # Criar a tabela de historico se nao existir
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS historico_chamados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pedido_id TEXT,
+            data_hora TEXT,
+            usuario TEXT,
+            campo TEXT,
+            valor_antigo TEXT,
+            valor_novo TEXT
+        )
+    ''')
+    
+    # Adicionar coluna Lista_Entrega_Cruzada se nao existir
+    try:
+        cursor.execute("ALTER TABLE chamados ADD COLUMN Lista_Entrega_Cruzada TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     # Identificar o delimitador do CSV analisando a primeira linha (cabeçalho)
     delimiter = ','
     with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
@@ -50,43 +70,105 @@ def sync_db():
         col_proc_db = next((c for c in colunas_db if 'Proced' in c), 'Procedência')
         col_trat_db = next((c for c in colunas_db if 'Tratativa' in c), 'Tratativa')
 
-        # Buscar IDs existentes na tabela do SQLite e se têm responsável, procedência ou tratativa
+        # 1. DE-DUPLICAR E LIMPAR O BANCO DE DADOS ATUAL
+        cursor.execute("SELECT * FROM chamados")
+        db_rows = cursor.fetchall()
+        
+        db_dict = {}
+        for row in db_rows:
+            row_dict = dict(zip(colunas_db, row))
+            ped_id = str(row_dict.get(col_id_db, "")).strip()
+            if not ped_id:
+                continue
+                
+            resp = str(row_dict.get(col_resp_db, "")).strip()
+            proc = str(row_dict.get(col_proc_db, "")).strip()
+            trat = str(row_dict.get(col_trat_db, "")).strip()
+            
+            is_treated = bool(resp or trat or (proc and proc.lower() != 'em analise'))
+            
+            if ped_id not in db_dict:
+                db_dict[ped_id] = row
+            else:
+                existing_row = db_dict[ped_id]
+                existing_dict = dict(zip(colunas_db, existing_row))
+                ext_resp = str(existing_dict.get(col_resp_db, "")).strip()
+                ext_proc = str(existing_dict.get(col_proc_db, "")).strip()
+                ext_trat = str(existing_dict.get(col_trat_db, "")).strip()
+                existing_treated = bool(ext_resp or ext_trat or (ext_proc and ext_proc.lower() != 'em analise'))
+                
+                if is_treated and not existing_treated:
+                    db_dict[ped_id] = row
+
+        # Recriar a tabela chamados limpa e reinserir os registros de-duplicados
+        cursor.execute("DELETE FROM chamados")
+        placeholders = ", ".join(["?"] * len(colunas_db))
+        sql_insert = f'INSERT INTO chamados VALUES ({placeholders})'
+        for row in db_dict.values():
+            cursor.execute(sql_insert, row)
+        print(f"Limpeza concluída: Banco de dados de-duplicado para {len(db_dict)} registros únicos.")
+
+        # 2. DE-DUPLICAR O CSV QUE VEM DO ARQUIVO
+        f.seek(0)
+        # Pular cabeçalho
+        next(f)
+        csv_reader = csv.reader(f, delimiter=delimiter)
+        
+        csv_dedup = {}
+        for row in csv_reader:
+            if len(row) < len(colunas_csv):
+                continue
+            valores_csv = [val.strip() for val in row]
+            
+            # Identificar o ID do Pedido
+            idx_id = colunas_csv.index(next(c for c in colunas_csv if 'ID_do_Pedido' in c or 'ID_Pedido' in c))
+            pedido_id = valores_csv[idx_id]
+            if not pedido_id:
+                continue
+                
+            idx_resp = colunas_csv.index(next(c for c in colunas_csv if 'Responsavel' in c))
+            idx_proc = colunas_csv.index(next(c for c in colunas_csv if 'Proced' in c))
+            idx_trat = colunas_csv.index(next(c for c in colunas_csv if 'Tratativa' in c))
+            
+            resp = valores_csv[idx_resp]
+            proc = valores_csv[idx_proc]
+            trat = valores_csv[idx_trat]
+            
+            is_treated = bool(resp or trat or (proc and proc.lower() != 'em analise'))
+            
+            if pedido_id not in csv_dedup:
+                csv_dedup[pedido_id] = valores_csv
+            else:
+                existing_val = csv_dedup[pedido_id]
+                ext_resp = existing_val[idx_resp]
+                ext_proc = existing_val[idx_proc]
+                ext_trat = existing_val[idx_trat]
+                existing_treated = bool(ext_resp or ext_trat or (ext_proc and ext_proc.lower() != 'em analise'))
+                
+                if is_treated and not existing_treated:
+                    csv_dedup[pedido_id] = valores_csv
+
+        # 3. MERGE DOS DADOS DE-DUPLICADOS
+        # Recarregar registros existentes para verificação
         cursor.execute(f'SELECT "{col_id_db}", "{col_resp_db}", "{col_proc_db}", "{col_trat_db}" FROM chamados')
         rows_existentes = cursor.fetchall()
-        
-        # Criar dicionário {id: (responsavel, procedencia, tratativa)} para busca rápida
         dict_existentes = {}
         for r in rows_existentes:
             ped_id = str(r[0]).strip()
-            resp = r[1]
-            proc = r[2]
-            trat = r[3]
-            dict_existentes[ped_id] = (resp, proc, trat)
+            dict_existentes[ped_id] = (r[1], r[2], r[3])
 
         novos_inseridos = 0
         atualizados = 0
         pula_tratados = 0
 
-        # Preparar inserção
-        placeholders = ", ".join(["?"] * len(colunas_db))
-        sql_insert = f'INSERT INTO chamados VALUES ({placeholders})'
-
         # Preparar atualização
         update_sets = ", ".join([f'"{col}" = ?' for col in colunas_db if col != col_id_db])
         sql_update = f'UPDATE chamados SET {update_sets} WHERE "{col_id_db}" = ?'
 
-        for row in reader:
-            valores_csv = [row.get(col, "") for col in colunas_csv]
-            
-            # Achar o ID do pedido dessa linha do CSV
-            idx_id = colunas_csv.index(next(c for c in colunas_csv if 'ID_do_Pedido' in c or 'ID_Pedido' in c))
-            pedido_id = str(valores_csv[idx_id]).strip()
-
+        for pedido_id, valores_csv in csv_dedup.items():
             if pedido_id in dict_existentes:
-                # O chamado já existe no banco de dados.
                 resp_existente, proc_existente, trat_existente = dict_existentes[pedido_id]
                 
-                # Se responsavel, tratativa e procedência forem nulos ou vazios (ou 'em analise'), podemos atualizar os dados (ainda pendente)
                 is_resp_empty = not resp_existente or str(resp_existente).strip() == ''
                 is_trat_empty = not trat_existente or str(trat_existente).strip() == ''
                 is_proc_empty = not proc_existente or str(proc_existente).strip() == '' or str(proc_existente).strip().lower() == 'em analise'
@@ -102,16 +184,14 @@ def sync_db():
                     cursor.execute(sql_update, valores_sem_id)
                     atualizados += 1
                 else:
-                    # Tem responsável, tratativa ou procedência, então o usuário já tratou/ajustou. PULAR!
                     pula_tratados += 1
             else:
-                # É um chamado novo, inserir
                 cursor.execute(sql_insert, valores_csv)
                 novos_inseridos += 1
 
         conn.commit()
         conn.close()
-        print(f"Sincronização concluída com sucesso:")
+        print(f"Sincronização concluída com de-duplicação:")
         print(f" - Novos chamados inseridos: {novos_inseridos}")
         print(f" - Chamados pendentes atualizados: {atualizados}")
         print(f" - Chamados tratados preservados (não alterados): {pula_tratados}")

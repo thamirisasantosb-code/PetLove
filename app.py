@@ -229,10 +229,28 @@ def fluxo_buscar(pedido):
         if row:
             linha = dict_from_row(row)
             try:
-                from exportar_petlove import buscar_lista_por_pedido
-                linha['Lista_Entrega_Cruzada'] = buscar_lista_por_pedido(pedido) or "Não encontrada"
-            except:
-                linha['Lista_Entrega_Cruzada'] = "Erro"
+                # Se a coluna existir e tiver valor no banco, usa ele. Caso contrário busca no CSV.
+                colunas = row.keys() if hasattr(row, 'keys') else []
+                if 'Lista_Entrega_Cruzada' in colunas and row['Lista_Entrega_Cruzada'] and str(row['Lista_Entrega_Cruzada']).strip():
+                    linha['Lista_Entrega_Cruzada'] = str(row['Lista_Entrega_Cruzada']).strip()
+                else:
+                    linha['Lista_Entrega_Cruzada'] = buscar_lista_por_pedido(pedido) or "Não encontrada"
+            except Exception as e:
+                # Tenta chamar a função local buscando no CSV
+                try:
+                    linha['Lista_Entrega_Cruzada'] = buscar_lista_por_pedido(pedido) or "Não encontrada"
+                except:
+                    linha['Lista_Entrega_Cruzada'] = "Erro"
+            
+            # Adicionar histórico de modificações do pedido
+            try:
+                conn_hist = get_db_connection()
+                hist_rows = conn_hist.execute("SELECT data_hora, usuario, campo, valor_antigo, valor_novo FROM historico_chamados WHERE pedido_id = ? ORDER BY id DESC", (str(pedido).strip(),)).fetchall()
+                conn_hist.close()
+                linha['Historico'] = [dict(r) for r in hist_rows]
+            except Exception as e:
+                linha['Historico'] = []
+                
             return jsonify(linha)
             
         return jsonify(erro="Pedido não encontrado no fluxo."), 404
@@ -244,6 +262,7 @@ def fluxo_buscar(pedido):
 def fluxo_atualizar():
     dados = request.get_json(silent=True) or {}
     pedido = str(dados.get("pedido", "")).strip()
+    usuario = session.get('nome', 'Usuário')
     
     if not pedido:
         return jsonify(erro="Pedido não informado."), 400
@@ -252,9 +271,14 @@ def fluxo_atualizar():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT * FROM chamados LIMIT 1")
+        # 1. Buscar valores antigos para o histórico
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row_antiga = cursor.fetchone()
+        if not row_antiga:
+            conn.close()
+            return jsonify(erro="Pedido não encontrado no fluxo."), 404
+            
         col_names = [description[0] for description in cursor.description]
-        
         col_justificativa = next((c for c in col_names if 'Justificativa' in c), 'Justificativa')
         col_procedencia = next((c for c in col_names if 'Proced' in c), 'Procedência')
         col_tratativa = next((c for c in col_names if 'Tratativa' in c), 'Tratativa')
@@ -262,6 +286,9 @@ def fluxo_atualizar():
         col_divergencia = next((c for c in col_names if 'Diverg' in c), 'Descrição_da_Divergência')
         col_valor = next((c for c in col_names if 'Valor' in c), 'Valor')
         
+        valores_antigos = dict(row_antiga)
+        
+        # 2. Executar o UPDATE
         sql = f"""
             UPDATE chamados 
             SET "{col_justificativa}" = ?,
@@ -273,20 +300,91 @@ def fluxo_atualizar():
             WHERE ID_do_Pedido = ?
         """
         
+        nova_justif = dados.get("justificativa", "")
+        nova_proc = dados.get("procedencia", "")
+        nova_trat = dados.get("tratativa", "")
+        novo_resp = dados.get("responsavel", "")
+        nova_diverg = dados.get("divergencia", "")
+        novo_valor = dados.get("valor", "")
+        
         cursor.execute(sql, (
-            dados.get("justificativa", ""),
-            dados.get("procedencia", ""),
-            dados.get("tratativa", ""),
-            dados.get("responsavel", ""),
-            dados.get("divergencia", ""),
-            dados.get("valor", ""),
+            nova_justif,
+            nova_proc,
+            nova_trat,
+            novo_resp,
+            nova_diverg,
+            novo_valor,
             pedido
         ))
         
-        if cursor.rowcount == 0:
+        # 3. Registrar modificações no histórico
+        import datetime
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        
+        def log_mudanca(campo, valor_ant, valor_nov):
+            val_ant_str = str(valor_ant or "").strip()
+            val_nov_str = str(valor_nov or "").strip()
+            if val_ant_str != val_nov_str:
+                cursor.execute("""
+                    INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (pedido, data_hora, usuario, campo, val_ant_str if val_ant_str else "Vazio", val_nov_str if val_nov_str else "Vazio"))
+
+        log_mudanca("Justificativa", valores_antigos.get(col_justificativa), nova_justif)
+        log_mudanca("Procedência", valores_antigos.get(col_procedencia), nova_proc)
+        log_mudanca("Tratativa", valores_antigos.get(col_tratativa), nova_trat)
+        log_mudanca("Responsável", valores_antigos.get(col_responsavel), novo_resp)
+        log_mudanca("Divergência", valores_antigos.get(col_divergencia), nova_diverg)
+        log_mudanca("Valor", valores_antigos.get(col_valor), novo_valor)
+        
+        conn.commit()
+        conn.close()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/fluxo/atualizar_romaneio")
+@login_required
+def fluxo_atualizar_romaneio():
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    novo_romaneio = str(dados.get("romaneio", "")).strip()
+    usuario = session.get('nome', 'Usuário')
+    
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row = cursor.fetchone()
+        if not row:
             conn.close()
-            return jsonify(erro="Pedido não encontrado no fluxo."), 404
+            return jsonify(erro="Pedido não encontrado."), 404
             
+        col_names = [description[0] for description in cursor.description]
+        col_romaneio = next((c for c in col_names if 'Lista_Entrega_Cruzada' in c), 'Lista_Entrega_Cruzada')
+        
+        valores_antigos = dict(row)
+        valor_antigo = valores_antigos.get(col_romaneio) or ""
+        
+        if str(valor_antigo).strip() == novo_romaneio:
+            conn.close()
+            return jsonify(sucesso=True)
+            
+        # Executa atualização
+        cursor.execute(f'UPDATE chamados SET "{col_romaneio}" = ? WHERE ID_do_Pedido = ?', (novo_romaneio, pedido))
+        
+        # Registrar no histórico
+        import datetime
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (pedido, data_hora, usuario, "Nº Romaneio", valor_antigo if valor_antigo else "Vazio/Erro", novo_romaneio))
+        
         conn.commit()
         conn.close()
         return jsonify(sucesso=True)

@@ -77,7 +77,18 @@
     <h2 style="margin-top:0; color: var(--accent);">Detalhes da Solicitação</h2>
     
     <div class="details-grid">
-      <div class="detail-item"><span class="detail-label">Nº Romaneio (Lista)</span><span class="detail-value" id="det-romaneio" style="color:var(--accent); font-weight:800;">-</span></div>
+      <div class="detail-item">
+        <span class="detail-label">Nº Romaneio (Lista)</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="detail-value" id="det-romaneio" style="color:var(--accent); font-weight:800;">-</span>
+          <button id="btn-edit-romaneio" style="background:none; border:none; padding:4px; cursor:pointer; color:var(--accent); display:inline-flex; align-items:center; font-size:16px;" title="Editar Romaneio">✏️</button>
+        </div>
+        <div id="container-edit-romaneio" class="hidden" style="margin-top:5px; display:flex; gap:6px; align-items:center;">
+          <input type="text" id="input-romaneio" style="padding:6px 10px; font-size:13px; border-radius:6px; width:120px;">
+          <button id="btn-save-romaneio" style="padding:6px 12px; font-size:12px; border-radius:6px; background:#38a169; color:#fff;" type="button">Salvar</button>
+          <button id="btn-cancel-romaneio" style="padding:6px 12px; font-size:12px; border-radius:6px; background:#e2e8f0; color:#4a5568;" type="button">Cancelar</button>
+        </div>
+      </div>
       <div class="detail-item"><span class="detail-label">Responsável Inicial</span><span class="detail-value" id="det-resp">-</span></div>
       <div class="detail-item"><span class="detail-label">Data da Rota</span><span class="detail-value" id="det-data-rota">-</span></div>
       <div class="detail-item"><span class="detail-label">Data da Reclamação</span><span class="detail-value" id="det-data-rec">-</span></div>
@@ -102,6 +113,16 @@
       <button id="btn-atualizar" type="button" class="full-width">Salvar e Atualizar</button>
     </div>
     <div id="status-atualizar"></div>
+
+    <!-- Histórico de Modificações -->
+    <div id="area-historico" style="margin-top: 30px; border-top: 1px solid var(--line); padding-top: 20px;">
+      <h3 style="margin-top:0; color: var(--accent); display:flex; align-items:center; gap:8px;">
+        📜 Histórico de Modificações
+      </h3>
+      <div id="lista-historico" style="display:flex; flex-direction:column; gap:12px; max-height: 250px; overflow-y: auto; padding-right:5px;">
+        <!-- Itens de histórico inseridos via JS -->
+      </div>
+    </div>
   </section>
 
 </main><script>
@@ -133,6 +154,32 @@ $('#form-busca').addEventListener('submit', async event => {
     
     pedidoAtual = pedido;
     $('#det-romaneio').textContent = data['Lista_Entrega_Cruzada'] || '-';
+    
+    // Fechar formulário de edição se estiver aberto
+    $('#container-edit-romaneio').classList.add('hidden');
+    $('#btn-edit-romaneio').style.display = 'inline-flex';
+    $('#det-romaneio').style.display = 'inline';
+
+    // Renderizar o histórico
+    const histLista = $('#lista-historico');
+    histLista.innerHTML = '';
+    const historico = data['Historico'] || [];
+    if (historico.length === 0) {
+      histLista.innerHTML = '<div style="color:var(--muted); font-style:italic; font-size:13px; text-align:center; padding: 10px;">Nenhuma alteração registrada ainda.</div>';
+    } else {
+      historico.forEach(item => {
+        const itemDiv = document.createElement('div');
+        itemDiv.style.cssText = 'background:#f8fafc; border: 1px solid var(--line); border-radius:8px; padding:10px 14px; font-size:13px;';
+        itemDiv.innerHTML = `
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:bold; color:var(--muted);">
+            <span>👤 ${item.usuario}</span>
+            <span>📅 ${item.data_hora}</span>
+          </div>
+          <div>Alterou <strong>${item.campo}</strong> de <span style="text-decoration:line-through; color:var(--secondary);">${item.valor_antigo || 'Vazio'}</span> para <span style="color:#38a169; font-weight:bold;">${item.valor_novo || 'Vazio'}</span></div>
+        `;
+        histLista.appendChild(itemDiv);
+      });
+    }
     $('#det-resp').textContent = data['Criado por'] || '-';
     $('#det-data-rota').textContent = data['Data do Carregamento'] || '-';
     $('#det-data-rec').textContent = data['Descrição da Reclamação'] || '-';
@@ -206,4 +253,66 @@ $('#btn-atualizar').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+// Lógica de Edição do Romaneio Inline
+const btnEditRomaneio = $('#btn-edit-romaneio');
+const containerEditRomaneio = $('#container-edit-romaneio');
+const inputRomaneio = $('#input-romaneio');
+const btnSaveRomaneio = $('#btn-save-romaneio');
+const btnCancelRomaneio = $('#btn-cancel-romaneio');
+const detRomaneio = $('#det-romaneio');
+
+if (btnEditRomaneio) {
+  btnEditRomaneio.addEventListener('click', () => {
+    const valAtual = detRomaneio.textContent.trim();
+    inputRomaneio.value = (valAtual === '-' || valAtual === 'Erro' || valAtual === 'Não encontrada') ? '' : valAtual;
+    
+    btnEditRomaneio.style.display = 'none';
+    detRomaneio.style.display = 'none';
+    containerEditRomaneio.classList.remove('hidden');
+    inputRomaneio.focus();
+  });
+}
+
+if (btnCancelRomaneio) {
+  btnCancelRomaneio.addEventListener('click', () => {
+    containerEditRomaneio.classList.add('hidden');
+    btnEditRomaneio.style.display = 'inline-flex';
+    detRomaneio.style.display = 'inline';
+  });
+}
+
+if (btnSaveRomaneio) {
+  btnSaveRomaneio.addEventListener('click', async () => {
+    const novoVal = inputRomaneio.value.trim();
+    btnSaveRomaneio.disabled = true;
+    btnCancelRomaneio.disabled = true;
+    
+    try {
+      const response = await fetch('/api/fluxo/atualizar_romaneio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedido: pedidoAtual, romaneio: novoVal })
+      });
+      
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.erro || 'Falha ao salvar romaneio.');
+      
+      detRomaneio.textContent = novoVal || '-';
+      
+      containerEditRomaneio.classList.add('hidden');
+      btnEditRomaneio.style.display = 'inline-flex';
+      detRomaneio.style.display = 'inline';
+      
+      // Recarregar os detalhes para atualizar o histórico na tela
+      $('#form-busca').dispatchEvent(new Event('submit'));
+      
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btnSaveRomaneio.disabled = false;
+      btnCancelRomaneio.disabled = false;
+    }
+  });
+}
 </script></body></html>
