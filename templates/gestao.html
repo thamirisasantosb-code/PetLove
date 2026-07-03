@@ -43,6 +43,14 @@
     .filters-container input:focus, .filters-container select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15); }
 
     #status{min-height:24px;margin-top:15px;color:var(--muted);font-weight:500;}
+    .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.04); display: flex; flex-direction: column; }
+    .stat-card .label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-card .value { font-size: 32px; font-weight: 800; color: var(--accent); }
+    .stat-card.pending-card { border-left: 5px solid var(--secondary); }
+    .stat-card.pending-card .value { color: var(--secondary); }
+    .stat-card.success-card { border-left: 5px solid #4CAF50; }
+    .stat-card.success-card .value { color: #4CAF50; }
   </style>
 </head>
 <body>
@@ -84,6 +92,22 @@
       <p>Acompanhamento e Listagem Geral</p>
     </div>
   </header>
+
+  <!-- Resumo de Solicitações (Cards de Estatísticas) -->
+  <div class="stats-container">
+    <div class="stat-card">
+      <span class="label">Total de Solicitações</span>
+      <span class="value" id="stat-total">0</span>
+    </div>
+    <div class="stat-card pending-card">
+      <span class="label">Aguardando Análise (Não Finalizados)</span>
+      <span class="value" id="stat-pendentes">0</span>
+    </div>
+    <div class="stat-card success-card">
+      <span class="label">Solicitações Finalizadas</span>
+      <span class="value" id="stat-finalizados">0</span>
+    </div>
+  </div>
 
   <section class="card">
     <div id="status">Carregando dados...</div>
@@ -138,6 +162,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     const response = await fetch('/api/fluxo/todos');
     const dados = await response.json();
     if (!response.ok) throw new Error(dados.erro || 'Falha ao buscar os dados.');
+    
+    // Atualizar contagem inicial de estatísticas
+    const totalInicial = dados.length;
+    const pendentesInicial = dados.filter(linha => !(linha['Responsavel'] || '').trim()).length;
+    
+    $('#stat-total').textContent = totalInicial;
+    $('#stat-pendentes').textContent = pendentesInicial;
+    $('#stat-finalizados').textContent = totalInicial - pendentesInicial;
     
     if (dados.length === 0) {
       status.textContent = 'Nenhuma solicitação encontrada na base de dados.';
@@ -203,6 +235,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       const criadorVal = criadorFilter ? criadorFilter.value.toLowerCase() : '';
       const motoristaVal = motoristaFilter ? motoristaFilter.value.toLowerCase() : '';
 
+      let totalFiltrado = 0;
+      let pendentesFiltrados = 0;
+
       const rows = tbody.querySelectorAll('tr');
       rows.forEach(row => {
         const idText = row.cells[1].textContent.toLowerCase();
@@ -217,10 +252,19 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (matchId && matchStatus && matchCriador && matchMotorista) {
           row.style.display = '';
+          totalFiltrado++;
+          const actionText = row.cells[0].textContent;
+          if (actionText === 'Analisar') {
+            pendentesFiltrados++;
+          }
         } else {
           row.style.display = 'none';
         }
       });
+
+      $('#stat-total').textContent = totalFiltrado;
+      $('#stat-pendentes').textContent = pendentesFiltrados;
+      $('#stat-finalizados').textContent = totalFiltrado - pendentesFiltrados;
     }
 
     if(idFilter) idFilter.addEventListener('input', aplicarFiltros);
