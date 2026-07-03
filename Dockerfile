@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Configurações de caminhos de dados persistentes
 ENV DATABASE_PATH=/app/data/petlove.db
-ENV BASE_DADOS_DIR=/app/data/Base de dados
+ENV BASE_DADOS_DIR="/app/data/Base de dados"
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY . .
 # Prepara diretório de defaults para inicialização de volumes persistentes
 RUN mkdir -p /app/defaults && \
     cp petlove.db /app/defaults/petlove.db && \
-    cp -r "Base de dados" /app/defaults/Base de dados
+    cp -r "Base de dados" "/app/defaults/Base de dados"
 
 # Torna o script de entrypoint executável
 RUN chmod +x /app/entrypoint.sh
