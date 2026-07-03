@@ -16,11 +16,11 @@ def sync_db():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Identificar o delimitador do CSV
+    # Identificar o delimitador do CSV analisando a primeira linha (cabeçalho)
     delimiter = ','
     with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
-        teste_f = f.read(1024)
-        if ';' in teste_f and ',' not in teste_f:
+        first_line = f.readline()
+        if first_line.count(';') > first_line.count(','):
             delimiter = ';'
 
     # Obter estrutura de colunas existentes ou criar
