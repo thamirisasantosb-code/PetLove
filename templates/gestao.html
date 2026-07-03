@@ -173,7 +173,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     // Atualizar contagem inicial de estatísticas
     const totalInicial = dados.length;
-    const pendentesInicial = dados.filter(linha => !(linha['Responsavel'] || '').trim() && !(linha['Procedência'] || '').trim()).length;
+    const pendentesInicial = dados.filter(linha => {
+      const resp = (linha['Responsavel'] || '').trim();
+      const trat = (linha['Tratativa'] || '').trim();
+      const proc = (linha['Procedência'] || '').trim();
+      const estaFin = resp !== '' || trat !== '' || (proc !== '' && proc.toLowerCase() !== 'em analise');
+      return !estaFin;
+    }).length;
     
     $('#stat-total').textContent = totalInicial;
     $('#stat-pendentes').textContent = pendentesInicial;
@@ -190,12 +196,15 @@ window.addEventListener('DOMContentLoaded', async () => {
       
       const proc = (linha['Procedência'] || '').trim();
       const responsavel = (linha['Responsavel'] || '').trim();
+      const tratativa = (linha['Tratativa'] || '').trim();
       
       let badgeClass = 'status-pendente';
       let badgeText = 'Pendente';
       
-      if (responsavel !== '' || proc !== '') {
-        if (proc === 'Procedente' || proc === 'Procedente') { 
+      const estaFinalizado = responsavel !== '' || tratativa !== '' || (proc !== '' && proc.toLowerCase() !== 'em analise');
+      
+      if (estaFinalizado) {
+        if (proc === 'Procedente') { 
             badgeClass = 'status-procedente'; 
             badgeText = 'Procedente'; 
         } else if (proc === 'Não Procedente' || proc === 'Nao Procedente' || proc === 'Improcedente') { 
@@ -207,14 +216,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
       
-      let actionText = (responsavel !== '' || proc !== '') ? 'Finalizada' : 'Analisar';
-      let actionClass = (responsavel !== '' || proc !== '') ? 'btn-finalizada' : 'btn-analisar';
+      let actionText = estaFinalizado ? 'Finalizada' : 'Analisar';
+      let actionClass = estaFinalizado ? 'btn-finalizada' : 'btn-analisar';
       
       const id_pedido = linha['ID_do_Pedido'] || '';
       const justif = (linha['Justificativa'] || '').substring(0, 40) + ((linha['Justificativa'] || '').length > 40 ? '...' : '');
  
-      let actionLink = (responsavel !== '' || proc !== '') ? 'javascript:void(0);' : `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
-      let actionStyle = (responsavel !== '' || proc !== '') ? 'cursor: not-allowed; opacity: 0.8;' : '';
+      let actionLink = estaFinalizado ? 'javascript:void(0);' : `/fluxo?pedido=${encodeURIComponent(id_pedido)}`;
+      let actionStyle = estaFinalizado ? 'cursor: not-allowed; opacity: 0.8;' : '';
 
       tr.innerHTML = `
         <td><a href="${actionLink}" class="${actionClass}" style="${actionStyle}">${actionText}</a></td>

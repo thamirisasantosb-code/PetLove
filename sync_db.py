@@ -44,22 +44,24 @@ def sync_db():
             cursor.execute(f'CREATE TABLE chamados ({colunas_sql})')
             print("Tabela 'chamados' criada pela primeira vez.")
 
-        # Identificar as colunas corretas de ID, Responsável e Procedência no SQLite
+        # Identificar as colunas corretas de ID, Responsável, Procedência e Tratativa no SQLite
         col_id_db = next((c for c in colunas_db if 'ID_do_Pedido' in c or 'ID_Pedido' in c), 'ID_do_Pedido')
         col_resp_db = next((c for c in colunas_db if 'Responsavel' in c), 'Responsavel')
         col_proc_db = next((c for c in colunas_db if 'Proced' in c), 'Procedência')
+        col_trat_db = next((c for c in colunas_db if 'Tratativa' in c), 'Tratativa')
 
-        # Buscar IDs existentes na tabela do SQLite e se têm responsável ou procedência
-        cursor.execute(f'SELECT "{col_id_db}", "{col_resp_db}", "{col_proc_db}" FROM chamados')
+        # Buscar IDs existentes na tabela do SQLite e se têm responsável, procedência ou tratativa
+        cursor.execute(f'SELECT "{col_id_db}", "{col_resp_db}", "{col_proc_db}", "{col_trat_db}" FROM chamados')
         rows_existentes = cursor.fetchall()
         
-        # Criar dicionário {id: (responsavel, procedencia)} para busca rápida
+        # Criar dicionário {id: (responsavel, procedencia, tratativa)} para busca rápida
         dict_existentes = {}
         for r in rows_existentes:
             ped_id = str(r[0]).strip()
             resp = r[1]
             proc = r[2]
-            dict_existentes[ped_id] = (resp, proc)
+            trat = r[3]
+            dict_existentes[ped_id] = (resp, proc, trat)
 
         novos_inseridos = 0
         atualizados = 0
@@ -82,13 +84,14 @@ def sync_db():
 
             if pedido_id in dict_existentes:
                 # O chamado já existe no banco de dados.
-                resp_existente, proc_existente = dict_existentes[pedido_id]
+                resp_existente, proc_existente, trat_existente = dict_existentes[pedido_id]
                 
-                # Se responsavel E procedência forem nulos ou vazios, podemos atualizar os dados (ainda pendente)
+                # Se responsavel, tratativa e procedência forem nulos ou vazios (ou 'em analise'), podemos atualizar os dados (ainda pendente)
                 is_resp_empty = not resp_existente or str(resp_existente).strip() == ''
-                is_proc_empty = not proc_existente or str(proc_existente).strip() == ''
+                is_trat_empty = not trat_existente or str(trat_existente).strip() == ''
+                is_proc_empty = not proc_existente or str(proc_existente).strip() == '' or str(proc_existente).strip().lower() == 'em analise'
                 
-                if is_resp_empty and is_proc_empty:
+                if is_resp_empty and is_trat_empty and is_proc_empty:
                     # Retirar o ID da lista de valores e colocar no final para a cláusula WHERE
                     valores_sem_id = []
                     for i, col in enumerate(colunas_csv):
@@ -99,7 +102,7 @@ def sync_db():
                     cursor.execute(sql_update, valores_sem_id)
                     atualizados += 1
                 else:
-                    # Tem responsável ou procedência, então o usuário já tratou/ajustou. PULAR!
+                    # Tem responsável, tratativa ou procedência, então o usuário já tratou/ajustou. PULAR!
                     pula_tratados += 1
             else:
                 # É um chamado novo, inserir
