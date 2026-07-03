@@ -56,6 +56,8 @@
     .stat-card.pending-card .value { color: var(--secondary); }
     .stat-card.success-card { border-left: 5px solid #4CAF50; }
     .stat-card.success-card .value { color: #4CAF50; }
+    .btn-limpar { background: #e2e8f0; color: #4a5568; border: 1px solid var(--line); padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-limpar:hover { background: #cbd5e0; color: #2d3748; }
   </style>
 </head>
 <body>
@@ -117,7 +119,7 @@
   <section class="card">
     <div id="status">Carregando dados...</div>
     
-    <div class="filters-container">
+    <div class="filters-container" style="align-items: center;">
       <input type="text" id="filtro-id" placeholder="Filtrar por ID do Pedido...">
       <select id="filtro-status">
         <option value="">Todos os Status</option>
@@ -129,6 +131,7 @@
       <input type="text" id="filtro-criador" placeholder="Filtrar por Criador...">
       {% endif %}
       <input type="text" id="filtro-motorista" placeholder="Filtrar por Motorista...">
+      <button id="btn-limpar-filtros" class="btn-limpar">🧹 Limpar Filtros</button>
     </div>
 
     <div class="table-wrap">
@@ -327,6 +330,21 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Ativar destaque inicial
     destacarCardAtivo();
+
+    // Evento de clique para limpar todos os filtros
+    const btnLimpar = document.getElementById('btn-limpar-filtros');
+    if (btnLimpar) {
+      btnLimpar.addEventListener('click', () => {
+        if (idFilter) idFilter.value = '';
+        if (statusFilter) statusFilter.value = '';
+        if (criadorFilter) criadorFilter.value = '';
+        if (motoristaFilter) motoristaFilter.value = '';
+        
+        filtroCardStatus = 'todos';
+        destacarCardAtivo();
+        aplicarFiltros();
+      });
+    }
 
   } catch (error) {
     status.style.color = 'var(--secondary)';
