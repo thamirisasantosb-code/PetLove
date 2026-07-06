@@ -184,6 +184,32 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('kpi-valor-risco').textContent = formatMoeda(valorRisco);
     document.getElementById('kpi-valor-perda').textContent = formatMoeda(valorPerda);
 
+    // Plugin customizado para desenhar quantidades em cima das barras/fatias
+    const datalabelsPlugin = {
+      id: 'datalabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (!meta.hidden) {
+            meta.data.forEach((element, index) => {
+              const val = dataset.data[index];
+              if (val !== undefined && val !== null && val !== 0) {
+                const position = element.tooltipPosition();
+                ctx.save();
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(val.toString(), position.x, position.y - 4);
+                ctx.restore();
+              }
+            });
+          }
+        });
+      }
+    };
+
     // Gráfico de Status (Rosca)
     new Chart(document.getElementById('chartStatus'), {
       type: 'doughnut',
@@ -195,7 +221,8 @@ window.addEventListener('DOMContentLoaded', async () => {
           borderWidth: 0
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: { responsive: true, maintainAspectRatio: false },
+      plugins: [datalabelsPlugin]
     });
 
     // Gráfico Regional (Barras Duplas)
@@ -219,7 +246,16 @@ window.addEventListener('DOMContentLoaded', async () => {
           borderRadius: 4
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display: true} }, scales: { x: { stacked: false }, y: { stacked: false } } }
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        plugins: { legend: {display: true} }, 
+        scales: { 
+          x: { stacked: false, grid: { display: false } }, 
+          y: { stacked: false, grid: { display: false } } 
+        } 
+      },
+      plugins: [datalabelsPlugin]
     });
 
     // Gráfico de Usuários (Barras Duplas)
@@ -247,7 +283,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: {display: true} },
-        scales: { x: { stacked: false }, y: { stacked: false } },
+        scales: { 
+          x: { stacked: false, grid: { display: false } }, 
+          y: { stacked: false, grid: { display: false } } 
+        },
         onClick: (event, activeElements) => {
           if (activeElements && activeElements.length > 0) {
             const index = activeElements[0].index;
@@ -258,7 +297,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         onHover: (event, activeElements) => {
           event.native.target.style.cursor = (activeElements && activeElements.length > 0) ? 'pointer' : 'default';
         }
-      }
+      },
+      plugins: [datalabelsPlugin]
     });
 
     // Configuração da Exportação para Excel
