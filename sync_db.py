@@ -36,6 +36,13 @@ def sync_db():
     except sqlite3.OperationalError:
         pass
 
+    # Adicionar coluna Status_da_Tratativa se nao existir
+    try:
+        cursor.execute("ALTER TABLE chamados ADD COLUMN Status_da_Tratativa TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     # Identificar o delimitador do CSV analisando a primeira linha (cabeçalho)
     delimiter = ','
     with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
@@ -102,11 +109,22 @@ def sync_db():
 
         # Recriar a tabela chamados limpa e reinserir os registros de-duplicados
         cursor.execute("DELETE FROM chamados")
-        placeholders = ", ".join(["?"] * len(colunas_db))
-        sql_insert = f'INSERT INTO chamados VALUES ({placeholders})'
+        
+        # Obter colunas reais da tabela (que incluem Lista_Entrega_Cruzada)
+        cursor.execute("PRAGMA table_info(chamados)")
+        colunas_reais = [r[1] for r in cursor.fetchall()]
+        placeholders_reais = ", ".join(["?"] * len(colunas_reais))
+        colunas_reais_str = ", ".join([f'"{c}"' for c in colunas_reais])
+        sql_insert_db = f'INSERT INTO chamados ({colunas_reais_str}) VALUES ({placeholders_reais})'
+        
         for row in db_dict.values():
-            cursor.execute(sql_insert, row)
+            cursor.execute(sql_insert_db, row)
         print(f"Limpeza concluída: Banco de dados de-duplicado para {len(db_dict)} registros únicos.")
+        
+        # Definir query para novos registros do CSV (14 colunas)
+        placeholders = ", ".join(["?"] * len(colunas_db))
+        colunas_csv_str = ", ".join([f'"{c}"' for c in colunas_db])
+        sql_insert = f'INSERT INTO chamados ({colunas_csv_str}) VALUES ({placeholders})'
 
         # 2. DE-DUPLICAR O CSV QUE VEM DO ARQUIVO
         f.seek(0)

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Definir Nova Senha - Petlove JM</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --line: #e2e8f0;
+      --text: #2d3748;
+      --muted: #718096;
+      --accent: #5e2a84;
+      --secondary: #ef4154;
+      --success: #38a169;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 'Inter', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reset-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 10px 40px rgba(94, 42, 132, 0.08);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .logos {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .jm-logo {
+      height: 60px;
+      object-fit: contain;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      color: var(--accent);
+      font-weight: 800;
+    }
+    p {
+      margin: 0 0 25px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      text-align: left;
+    }
+    label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: 0.2s;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15);
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
+      margin-top: 10px;
+    }
+    button:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .erro {
+      color: var(--secondary);
+      background: #fef2f2;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      border: 1px solid #fecaca;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="reset-card">
+    <div class="logos">
+      <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'font-weight:900;font-size:36px;color:var(--accent);letter-spacing:-1px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:20px;\'>TD</span></div>'">
+    </div>
+    <h1>Definir Nova Senha</h1>
+    <p>Escolha uma nova senha forte para proteger sua conta e acessar o sistema.</p>
+    
+    {% if erro %}
+    <div class="erro">{{ erro }}</div>
+    {% endif %}
+    
+    <div id="js-erro" class="erro" style="display:none;"></div>
+
+    <form method="POST" onsubmit="return validarForm(event)">
+      <label>Nova Senha
+        <div style="position: relative; margin-top: 5px;">
+          <input type="password" name="nova_senha" id="nova_senha" required placeholder="Digite a nova senha" autofocus minlength="6" style="padding-right: 40px;">
+          <span onclick="togglePasswordVisibility('nova_senha', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--muted); display: flex; align-items: center; justify-content: center; user-select: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </span>
+        </div>
+      </label>
+      <label>Confirme a Nova Senha
+        <div style="position: relative; margin-top: 5px;">
+          <input type="password" name="confirmacao" id="confirmacao" required placeholder="Confirme a nova senha" minlength="6" style="padding-right: 40px;">
+          <span onclick="togglePasswordVisibility('confirmacao', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--muted); display: flex; align-items: center; justify-content: center; user-select: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </span>
+        </div>
+      </label>
+      <button type="submit">Salvar e Acessar</button>
+    </form>
+  </div>
+  
+  <script>
+    function validarForm(e) {
+      const senha = document.getElementById('nova_senha').value;
+      const confirmacao = document.getElementById('confirmacao').value;
+      const erroDiv = document.getElementById('js-erro');
+      
+      erroDiv.style.display = 'none';
+      
+      if (senha !== confirmacao) {
+        e.preventDefault();
+        erroDiv.textContent = 'As senhas não coincidem. Verifique e tente novamente.';
+        erroDiv.style.display = 'block';
+        return false;
+      }
+      
+      if (senha.length < 6) {
+        e.preventDefault();
+        erroDiv.textContent = 'A senha deve possuir no mínimo 6 caracteres.';
+        erroDiv.style.display = 'block';
+        return false;
+      }
+      
+      return true;
+    }
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+          </svg>
+        `;
+      } else {
+        input.type = 'password';
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>

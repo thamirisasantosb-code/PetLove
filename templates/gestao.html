@@ -130,6 +130,11 @@
         <option value="Procedente">Procedente</option>
         <option value="Não Proc">Não Procedente</option>
       </select>
+      <select id="filtro-status-tratativa">
+        <option value="">Status Tratativa (Todos)</option>
+        <option value="Em Andamento">Em Andamento</option>
+        <option value="Finalizado">Finalizado</option>
+      </select>
       {% if perfil == 'Admin' %}
       <input type="text" id="filtro-criador" placeholder="Filtrar por Criador...">
       {% endif %}
@@ -147,6 +152,7 @@
           <tr>
             <th style="width: 100px;">ID Pedido</th>
             <th style="width: 110px;">Status</th>
+            <th style="width: 140px;">Status Tratativa</th>
             <th style="width: 180px;">Criado por</th>
             <th style="width: 250px;">Motorista</th>
             <th style="width: 100px;">Data Rec.</th>
@@ -223,6 +229,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
       
+      const statusTrat = (linha['Status da Tratativa'] || 'Em Andamento').trim();
+      let badgeTratClass = 'status-pendente';
+      if (statusTrat === 'Finalizado') {
+        badgeTratClass = 'status-procedente';
+      }
+      
       tr.dataset.finalizado = estaFinalizado ? 'true' : 'false';
       
       const id_pedido = linha['ID_do_Pedido'] || '';
@@ -235,6 +247,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       tr.innerHTML = `
         <td class="col-no-wrap" style="font-weight:bold; color:var(--accent);">${id_pedido}</td>
         <td class="col-no-wrap"><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+        <td class="col-no-wrap"><span class="status-badge ${badgeTratClass}">${statusTrat}</span></td>
         <td>${linha['Criado por'] || ''}</td>
         <td>${linha['Motorista'] || ''}</td>
         <td class="col-no-wrap">${linha['Descrição da Reclamação'] || ''}</td>
@@ -249,6 +262,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Configuração dos Filtros
     const idFilter = document.getElementById('filtro-id');
     const statusFilter = document.getElementById('filtro-status');
+    const statusTratFilter = document.getElementById('filtro-status-tratativa');
     const criadorFilter = document.getElementById('filtro-criador');
     const motoristaFilter = document.getElementById('filtro-motorista');
 
@@ -257,6 +271,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     function aplicarFiltros() {
       const idVal = idFilter ? idFilter.value.toLowerCase() : '';
       const statusVal = statusFilter ? statusFilter.value.toLowerCase() : '';
+      const statusTratVal = statusTratFilter ? statusTratFilter.value.toLowerCase() : '';
       const criadorVal = criadorFilter ? criadorFilter.value.toLowerCase() : '';
       const motoristaVal = motoristaFilter ? motoristaFilter.value.toLowerCase() : '';
 
@@ -267,16 +282,18 @@ window.addEventListener('DOMContentLoaded', async () => {
       rows.forEach(row => {
         const idText = row.cells[0].textContent.toLowerCase();
         const statusText = row.cells[1].textContent.toLowerCase();
-        const criadorText = row.cells[2].textContent.toLowerCase();
-        const motoristaText = row.cells[3].textContent.toLowerCase();
+        const statusTratText = row.cells[2].textContent.toLowerCase();
+        const criadorText = row.cells[3].textContent.toLowerCase();
+        const motoristaText = row.cells[4].textContent.toLowerCase();
         const estaFin = row.dataset.finalizado === 'true';
 
         const matchId = idText.includes(idVal);
         const matchStatus = statusVal === '' || statusText.includes(statusVal);
+        const matchStatusTrat = statusTratVal === '' || statusTratText.includes(statusTratVal);
         const matchCriador = criadorText.includes(criadorVal);
         const matchMotorista = motoristaText.includes(motoristaVal);
 
-        if (matchId && matchStatus && matchCriador && matchMotorista) {
+        if (matchId && matchStatus && matchStatusTrat && matchCriador && matchMotorista) {
           totalFiltrado++;
           if (!estaFin) {
             pendentesFiltrados++;
@@ -307,6 +324,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     if(idFilter) idFilter.addEventListener('input', aplicarFiltros);
     if(statusFilter) statusFilter.addEventListener('change', aplicarFiltros);
+    if(statusTratFilter) statusTratFilter.addEventListener('change', aplicarFiltros);
     if(criadorFilter) criadorFilter.addEventListener('input', aplicarFiltros);
     if(motoristaFilter) motoristaFilter.addEventListener('input', aplicarFiltros);
 
@@ -367,6 +385,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       btnLimpar.addEventListener('click', () => {
         if (idFilter) idFilter.value = '';
         if (statusFilter) statusFilter.value = '';
+        if (statusTratFilter) statusTratFilter.value = '';
         if (criadorFilter) criadorFilter.value = '';
         if (motoristaFilter) motoristaFilter.value = '';
         

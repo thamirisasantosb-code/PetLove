@@ -188,6 +188,249 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# Criar tabela de recuperação de senha se não existir
+try:
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS recuperacao_senha (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT,
+            token TEXT,
+            senha_provisoria TEXT,
+            data_criacao TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+except Exception as e:
+    print(f"Erro ao inicializar tabela recuperacao_senha: {e}")
+
+def atualizar_senha_csv(email, nova_senha):
+    csv_path = BASE_DADOS_DIR / "usuarios.csv"
+    if not csv_path.exists():
+        return False
+    
+    linhas = []
+    atualizado = False
+    campos = ["Email", "Senha", "Perfil", "Nome"] # colunas padrão
+    
+    with open(csv_path, mode='r', newline='', encoding='utf-8', errors='ignore') as f:
+        leitor = csv.DictReader(f)
+        if leitor.fieldnames:
+            campos = leitor.fieldnames
+        for row in leitor:
+            if row.get("Email") == email:
+                row["Senha"] = nova_senha
+                atualizado = True
+            linhas.append(row)
+            
+    if atualizado:
+        with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
+            escritor = csv.DictWriter(f, fieldnames=campos)
+            escritor.writeheader()
+            for row in linhas:
+                escritor.writerow(row)
+        return True
+    return False
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def enviar_email_recuperacao(email, senha_provisoria, link_confirmacao):
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    except:
+        smtp_port = 587
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@jmdistribuicao.com.br")
+
+    assunto = "Recuperacao de Senha - Portal Petlove JM"
+    corpo = f"""Olá,
+
+Foi solicitada a recuperação de senha para sua conta no Portal Petlove JM.
+
+Sua senha temporária gerada é: {senha_provisoria}
+
+Para confirmar a recuperação de senha e redefinir para sua senha desejada, clique no link abaixo:
+{link_confirmacao}
+
+Atenção: Este link é obrigatório para ativar seu acesso e definir sua senha definitiva.
+
+Se você não solicitou esta recuperação, por favor desconsidere este e-mail.
+
+Atenciosamente,
+Equipe JM Distribuição
+"""
+
+    if not smtp_user or not smtp_password:
+        print("\n=== [SIMULACAO DE ENVIO DE E-MAIL] ===")
+        print(f"Para: {email}")
+        print(f"De: {smtp_from}")
+        print(f"Assunto: {assunto}")
+        print(f"Conteúdo:\n{corpo}")
+        print("======================================\n")
+        return True, "Simulado no console (sem credenciais SMTP configuradas)."
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_from
+        msg['To'] = email
+        msg['Subject'] = assunto
+        msg.attach(MIMEText(corpo, 'plain', 'utf-8'))
+
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        return True, "E-mail enviado com sucesso."
+    except Exception as e:
+        print(f"Erro ao enviar e-mail real: {e}")
+        print("\n=== [FALLBACK - SIMULACAO DE E-MAIL] ===")
+        print(f"Para: {email}")
+        print(f"Conteúdo:\n{corpo}")
+        print("========================================\n")
+        return False, str(e)
+
+@app.before_request
+def verificar_forcar_redefinicao():
+    if session.get('forcar_redefinicao'):
+        # Rotas permitidas quando forçando redefinição
+        rotas_permitidas = ['definir_senha', 'logout', 'static']
+        if request.endpoint and request.endpoint not in rotas_permitidas:
+            return redirect(url_for('definir_senha'))
+
+@app.post("/api/esqueci-senha")
+def api_esqueci_senha():
+    import random
+    import string
+    import datetime
+    dados = request.get_json(silent=True) or {}
+    email = dados.get("email", "").strip()
+    
+    if not email or "@" not in email:
+        return jsonify(erro="E-mail inválido."), 400
+        
+    csv_path = BASE_DADOS_DIR / "usuarios.csv"
+    email_cadastrado = False
+    
+    # Verifica se e-mail está cadastrado
+    if csv_path.exists():
+        with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+            leitor = csv.DictReader(f)
+            for row in leitor:
+                if row.get("Email") == email:
+                    email_cadastrado = True
+                    break
+                    
+    if not email_cadastrado:
+        return jsonify(erro="Este e-mail não está cadastrado no sistema."), 404
+        
+    # Gera senha de 6 caracteres aleatórios
+    senha_provisoria = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+    token = str(uuid4())
+    data_criacao = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Salva no SQLite
+    try:
+        conn = get_db_connection()
+        conn.execute(
+            "INSERT INTO recuperacao_senha (email, token, senha_provisoria, data_criacao) VALUES (?, ?, ?, ?)",
+            (email, token, senha_provisoria, data_criacao)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        return jsonify(erro=f"Erro ao salvar solicitação: {str(e)}"), 500
+        
+    # Cria o link de confirmação
+    url_base = request.host_url.rstrip('/')
+    link_confirmacao = f"{url_base}/confirmar-recuperacao?email={email}&token={token}"
+    
+    sucesso, msg = enviar_email_recuperacao(email, senha_provisoria, link_confirmacao)
+    
+    return jsonify(sucesso=True, mensagem=msg)
+
+@app.route("/confirmar-recuperacao")
+def confirmar_recuperacao():
+    email = request.args.get("email", "").strip()
+    token = request.args.get("token", "").strip()
+    
+    if not email or not token:
+        return render_template("login.html", erro="Link de confirmação inválido ou incompleto.")
+        
+    try:
+        conn = get_db_connection()
+        row = conn.execute("SELECT * FROM recuperacao_senha WHERE email = ? AND token = ?", (email, token)).fetchone()
+        
+        if not row:
+            conn.close()
+            return render_template("login.html", erro="Token de confirmação inválido ou já utilizado.")
+            
+        senha_provisoria = row["senha_provisoria"]
+        
+        # Atualiza a senha no CSV para a provisória
+        atualizar_senha_csv(email, senha_provisoria)
+        
+        # Busca perfil e nome no CSV para montar a sessão
+        nome = email.split("@")[0].replace(".", " ").title()
+        perfil = "Usuario"
+        csv_path = BASE_DADOS_DIR / "usuarios.csv"
+        if csv_path.exists():
+            with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+                leitor = csv.DictReader(f)
+                for user in leitor:
+                    if user.get("Email") == email:
+                        nome = user.get("Nome", nome)
+                        perfil = user.get("Perfil", perfil)
+                        break
+                        
+        # Deleta a entrada de recuperação
+        conn.execute("DELETE FROM recuperacao_senha WHERE email = ? AND token = ?", (email, token))
+        conn.commit()
+        conn.close()
+        
+        # Loga o usuário temporariamente e obriga a redefinir a senha
+        session['usuario'] = email
+        session['nome'] = nome
+        session['perfil'] = perfil
+        session['forcar_redefinicao'] = True
+        
+        return redirect(url_for('definir_senha'))
+        
+    except Exception as e:
+        return render_template("login.html", erro=f"Erro interno ao confirmar recuperação: {str(e)}")
+
+@app.route("/definir-senha", methods=["GET", "POST"])
+def definir_senha():
+    if not session.get('forcar_redefinicao'):
+        return redirect(url_for('login'))
+        
+    email = session.get('usuario')
+    
+    if request.method == "POST":
+        nova_senha = request.form.get("nova_senha", "").strip()
+        confirmacao = request.form.get("confirmacao", "").strip()
+        
+        if not nova_senha:
+            return render_template("definir_senha.html", erro="A senha não pode ser vazia.")
+            
+        if nova_senha != confirmacao:
+            return render_template("definir_senha.html", erro="As senhas não coincidem.")
+            
+        # Atualiza a senha no CSV para a definitiva
+        if atualizar_senha_csv(email, nova_senha):
+            # Limpa flag de redefinição
+            session.pop('forcar_redefinicao', None)
+            return redirect(url_for('index'))
+        else:
+            return render_template("definir_senha.html", erro="Erro ao atualizar a senha no banco de dados.")
+            
+    return render_template("definir_senha.html")
+
 def dict_from_row(row):
     d = dict(row)
     # Renomear as chaves de volta para o formato esperado pelo frontend
@@ -285,20 +528,9 @@ def fluxo_atualizar():
         col_responsavel = next((c for c in col_names if 'Responsavel' in c), 'Responsavel')
         col_divergencia = next((c for c in col_names if 'Diverg' in c), 'Descrição_da_Divergência')
         col_valor = next((c for c in col_names if 'Valor' in c), 'Valor')
+        col_status = next((c for c in col_names if 'Status' in c), 'Status_da_Tratativa')
         
         valores_antigos = dict(row_antiga)
-        
-        # 2. Executar o UPDATE
-        sql = f"""
-            UPDATE chamados 
-            SET "{col_justificativa}" = ?,
-                "{col_procedencia}" = ?,
-                "{col_tratativa}" = ?,
-                "{col_responsavel}" = ?,
-                "{col_divergencia}" = ?,
-                "{col_valor}" = ?
-            WHERE ID_do_Pedido = ?
-        """
         
         nova_justif = dados.get("justificativa", "")
         nova_proc = dados.get("procedencia", "")
@@ -307,6 +539,25 @@ def fluxo_atualizar():
         nova_diverg = dados.get("divergencia", "")
         novo_valor = dados.get("valor", "")
         
+        proc_clean = nova_proc.strip().lower() if nova_proc else ""
+        if proc_clean and proc_clean != "em analise" and nova_trat.strip():
+            novo_status = "Finalizado"
+        else:
+            novo_status = "Em Andamento"
+            
+        # 2. Executar o UPDATE
+        sql = f"""
+            UPDATE chamados 
+            SET "{col_justificativa}" = ?,
+                "{col_procedencia}" = ?,
+                "{col_tratativa}" = ?,
+                "{col_responsavel}" = ?,
+                "{col_divergencia}" = ?,
+                "{col_valor}" = ?,
+                "{col_status}" = ?
+            WHERE ID_do_Pedido = ?
+        """
+        
         cursor.execute(sql, (
             nova_justif,
             nova_proc,
@@ -314,6 +565,7 @@ def fluxo_atualizar():
             novo_resp,
             nova_diverg,
             novo_valor,
+            novo_status,
             pedido
         ))
         
@@ -336,6 +588,7 @@ def fluxo_atualizar():
         log_mudanca("Responsável", valores_antigos.get(col_responsavel), novo_resp)
         log_mudanca("Divergência", valores_antigos.get(col_divergencia), nova_diverg)
         log_mudanca("Valor", valores_antigos.get(col_valor), novo_valor)
+        log_mudanca("Status da Tratativa", valores_antigos.get(col_status), novo_status)
         
         conn.commit()
         conn.close()
@@ -529,6 +782,10 @@ def fluxo_novo():
         
         valores = []
         for col in col_names:
+            if col == "Status_da_Tratativa":
+                valores.append("Em Andamento")
+                continue
+                
             key_space = col.replace("_", " ")
             if "ID do Pedido" in key_space: key_space = "ID_do_Pedido"
             if "Regional 2" in key_space: key_space = "Regional_2"

@@ -97,6 +97,7 @@
       <div class="detail-item"><span class="detail-label">Rota</span><span class="detail-value" id="det-rota">-</span></div>
       <div class="detail-item"><span class="detail-label">Regional</span><span class="detail-value" id="det-reg">-</span></div>
       <div class="detail-item"><span class="detail-label">Valor (R$)</span><span class="detail-value" id="det-valor" style="font-weight:900; color:var(--accent);">-</span></div>
+      <div class="detail-item"><span class="detail-label">Status da Tratativa</span><span class="detail-value" id="det-status-tratativa" style="font-weight:900;">-</span></div>
       <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Descrição da Divergência</span><span class="detail-value" id="det-divergencia" style="white-space: pre-wrap;">-</span></div>
       <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Justificativa</span><span class="detail-value" id="det-justificativa" style="white-space: pre-wrap;">-</span></div>
     </div>
@@ -190,6 +191,22 @@ $('#form-busca').addEventListener('submit', async event => {
     $('#det-valor').textContent = data['Valor'] || '-';
     $('#det-divergencia').textContent = data['Descrição da Divergência'] || '-';
     $('#det-justificativa').textContent = data['Justificativa'] || '-';
+    
+    const statusTrat = data['Status da Tratativa'] || 'Em Andamento';
+    $('#det-status-tratativa').textContent = statusTrat;
+    if (statusTrat === 'Finalizado') {
+        $('#det-status-tratativa').style.color = '#22543d';
+        $('#det-status-tratativa').style.background = '#c6f6d5';
+        $('#det-status-tratativa').style.padding = '2px 8px';
+        $('#det-status-tratativa').style.borderRadius = '12px';
+        $('#det-status-tratativa').style.width = 'fit-content';
+    } else {
+        $('#det-status-tratativa').style.color = '#4a5568';
+        $('#det-status-tratativa').style.background = '#edf2f7';
+        $('#det-status-tratativa').style.padding = '2px 8px';
+        $('#det-status-tratativa').style.borderRadius = '12px';
+        $('#det-status-tratativa').style.width = 'fit-content';
+    }
     
     $('#tratativa').value = data['Tratativa'] || '';
     $('#procedencia').value = data['Procedência'] || '';
