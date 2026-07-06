@@ -434,15 +434,15 @@ def definir_senha():
 @app.route("/usuarios")
 @login_required
 def usuarios_dashboard():
-    if session.get("perfil") != "Admin":
-        return render_template("login.html", erro="Acesso não autorizado para esta conta."), 403
+    if session.get("usuario") != "admin@jm.com":
+        return render_template("login.html", erro="Acesso não autorizado. Apenas o administrador principal (admin@jm.com) pode gerenciar usuários."), 403
     return render_template("usuarios.html", usuario=session.get('nome'), perfil=session.get('perfil'))
 
 @app.route("/api/usuarios")
 @login_required
 def api_listar_usuarios():
-    if session.get("perfil") != "Admin":
-        return jsonify(erro="Acesso negado."), 403
+    if session.get("usuario") != "admin@jm.com":
+        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
         
     csv_path = BASE_DADOS_DIR / "usuarios.csv"
     if not csv_path.exists():
@@ -462,8 +462,8 @@ def api_listar_usuarios():
 @app.route("/api/usuarios/salvar", methods=["POST"])
 @login_required
 def api_salvar_usuario():
-    if session.get("perfil") != "Admin":
-        return jsonify(erro="Acesso negado."), 403
+    if session.get("usuario") != "admin@jm.com":
+        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
         
     dados = request.get_json(silent=True) or {}
     email = dados.get("email", "").strip()
@@ -522,8 +522,8 @@ def api_salvar_usuario():
 @app.route("/api/usuarios/deletar", methods=["POST"])
 @login_required
 def api_deletar_usuario():
-    if session.get("perfil") != "Admin":
-        return jsonify(erro="Acesso negado."), 403
+    if session.get("usuario") != "admin@jm.com":
+        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
         
     dados = request.get_json(silent=True) or {}
     email = dados.get("email", "").strip()
@@ -956,13 +956,6 @@ def fluxo_todos():
         conn.close()
         
         linhas = [dict_from_row(row) for row in rows]
-        
-        perfil = session.get('perfil', 'Usuario')
-        nome_usuario = session.get('nome', '')
-        
-        if perfil != 'Admin':
-            linhas = [linha for linha in linhas if str(linha.get('Criado por', '')).strip().lower() == str(nome_usuario).strip().lower()]
-            
         return jsonify(linhas)
     except Exception as e:
         return jsonify(erro=str(e)), 500

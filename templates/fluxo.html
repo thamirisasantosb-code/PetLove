@@ -45,8 +45,8 @@
       <a href="/">Consulta TMSLOG</a>
       <a href="/nova-acareacao">Nova Acareação</a>
       <a href="/gestao">Gestão de Solicitações</a>
-      {% if perfil == 'Admin' %}
       <a href="/dashboard">Dashboard Gerencial</a>
+      {% if session.usuario == 'admin@jm.com' %}
       <a href="/usuarios">Usuários</a>
       {% endif %}
     </div>
