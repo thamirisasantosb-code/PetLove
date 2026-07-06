@@ -431,6 +431,141 @@ def definir_senha():
             
     return render_template("definir_senha.html")
 
+@app.route("/usuarios")
+@login_required
+def usuarios_dashboard():
+    if session.get("perfil") != "Admin":
+        return render_template("login.html", erro="Acesso não autorizado para esta conta."), 403
+    return render_template("usuarios.html", usuario=session.get('nome'), perfil=session.get('perfil'))
+
+@app.route("/api/usuarios")
+@login_required
+def api_listar_usuarios():
+    if session.get("perfil") != "Admin":
+        return jsonify(erro="Acesso negado."), 403
+        
+    csv_path = BASE_DADOS_DIR / "usuarios.csv"
+    if not csv_path.exists():
+        return jsonify([])
+        
+    usuarios = []
+    with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+        leitor = csv.DictReader(f)
+        for row in leitor:
+            usuarios.append({
+                "Email": row.get("Email"),
+                "Nome": row.get("Nome"),
+                "Perfil": row.get("Perfil")
+            })
+    return jsonify(usuarios)
+
+@app.route("/api/usuarios/salvar", methods=["POST"])
+@login_required
+def api_salvar_usuario():
+    if session.get("perfil") != "Admin":
+        return jsonify(erro="Acesso negado."), 403
+        
+    dados = request.get_json(silent=True) or {}
+    email = dados.get("email", "").strip()
+    nome = dados.get("nome", "").strip()
+    perfil = dados.get("perfil", "").strip()
+    senha = dados.get("senha", "").strip()
+    
+    if not email or not nome or not perfil:
+        return jsonify(erro="Preencha os campos obrigatórios (E-mail, Nome e Perfil)."), 400
+        
+    if perfil not in ["Admin", "Usuario"]:
+        return jsonify(erro="Perfil inválido."), 400
+        
+    csv_path = BASE_DADOS_DIR / "usuarios.csv"
+    
+    linhas = []
+    editado = False
+    campos = ["Email", "Senha", "Perfil", "Nome"]
+    
+    if csv_path.exists():
+        with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+            leitor = csv.DictReader(f)
+            if leitor.fieldnames:
+                campos = leitor.fieldnames
+            for row in leitor:
+                if row.get("Email") == email:
+                    row["Nome"] = nome
+                    row["Perfil"] = perfil
+                    if senha:
+                        row["Senha"] = senha
+                    editado = True
+                linhas.append(row)
+                
+    if not editado:
+        # Novo usuário. Senha é obrigatória para novos usuários
+        if not senha:
+            return jsonify(erro="A senha é obrigatória para novos usuários."), 400
+        linhas.append({
+            "Email": email,
+            "Senha": senha,
+            "Perfil": perfil,
+            "Nome": nome
+        })
+        
+    # Grava de volta no CSV
+    try:
+        with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
+            escritor = csv.DictWriter(f, fieldnames=campos)
+            escritor.writeheader()
+            for row in linhas:
+                escritor.writerow(row)
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=f"Erro ao salvar usuário: {str(e)}"), 500
+
+@app.route("/api/usuarios/deletar", methods=["POST"])
+@login_required
+def api_deletar_usuario():
+    if session.get("perfil") != "Admin":
+        return jsonify(erro="Acesso negado."), 403
+        
+    dados = request.get_json(silent=True) or {}
+    email = dados.get("email", "").strip()
+    
+    if not email:
+        return jsonify(erro="E-mail do usuário não informado."), 400
+        
+    # Impedir que o administrador delete a si mesmo
+    if email == session.get("usuario"):
+        return jsonify(erro="Você não pode excluir sua própria conta."), 400
+        
+    csv_path = BASE_DADOS_DIR / "usuarios.csv"
+    if not csv_path.exists():
+        return jsonify(erro="Arquivo de usuários não encontrado."), 404
+        
+    linhas = []
+    deletado = False
+    campos = ["Email", "Senha", "Perfil", "Nome"]
+    
+    with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+        leitor = csv.DictReader(f)
+        if leitor.fieldnames:
+            campos = leitor.fieldnames
+        for row in leitor:
+            if row.get("Email") == email:
+                deletado = True
+                continue
+            linhas.append(row)
+            
+    if not deletado:
+        return jsonify(erro="Usuário não encontrado."), 404
+        
+    try:
+        with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
+            escritor = csv.DictWriter(f, fieldnames=campos)
+            escritor.writeheader()
+            for row in linhas:
+                escritor.writerow(row)
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=f"Erro ao excluir usuário: {str(e)}"), 500
+
 def dict_from_row(row):
     d = dict(row)
     # Renomear as chaves de volta para o formato esperado pelo frontend

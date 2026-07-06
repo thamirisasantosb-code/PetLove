@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gerenciamento de Usuários - Petlove JM</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --line: #e2e8f0;
+      --text: #2d3748;
+      --muted: #718096;
+      --accent: #5e2a84;
+      --secondary: #ef4154;
+      --success: #38a169;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 'Inter', system-ui, sans-serif;
+    }
+    main {
+      width: min(1400px, 96%);
+      margin: 30px auto;
+    }
+    
+    /* Nav */
+    .nav { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; justify-content: space-between; }
+    .nav-links { display:flex; gap:15px; }
+    .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
+    .nav a:hover { background: var(--line); }
+    .nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    
+    .corporate-header { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--line); padding: 25px 35px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(94, 42, 132, 0.06); flex-wrap: wrap; gap: 20px;}
+    .corporate-header .jm-logo { height: 60px; object-fit: contain; }
+    .title-area { text-align: right; }
+    .title-area h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
+    .title-area p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 500;}
+    
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.05); margin-bottom: 20px; }
+    
+    .header-tabela { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+    .header-tabela h2 { margin: 0; font-size: 18px; color: var(--accent); font-weight: 800; }
+    
+    /* Table */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); }
+    th, td { padding: 14px 18px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
+    th { background: #f8f9fa; font-weight: 700; color: var(--accent); }
+    tr:hover td { background: rgba(94, 42, 132, 0.02); }
+    
+    /* Badges */
+    .badge { padding: 4px 8px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
+    .badge-admin { background: rgba(94, 42, 132, 0.1); color: var(--accent); }
+    .badge-usuario { background: #edf2f7; color: #4a5568; }
+    
+    /* Buttons */
+    .btn { border: 0; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-danger { background: var(--secondary); color: #fff; }
+    .btn-danger:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-secondary { background: var(--line); color: var(--text); }
+    .btn-secondary:hover { background: #cbd5e0; }
+    .btn-small { padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+    
+    /* Modais */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s ease-in-out; }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-card { background: #fff; border-radius: 16px; width: 100%; max-width: 450px; padding: 30px; box-shadow: 0 15px 50px rgba(0,0,0,0.15); transform: scale(0.95); transition: transform 0.2s ease-in-out; }
+    .modal-overlay.active .modal-card { transform: scale(1); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-header h3 { margin: 0; font-size: 18px; color: var(--accent); font-weight: 800; }
+    .modal-close { cursor: pointer; font-size: 20px; font-weight: bold; color: var(--muted); border: none; background: none; }
+    .modal-close:hover { color: var(--secondary); }
+    
+    /* Form */
+    form { display: flex; flex-direction: column; gap: 15px; }
+    label { font-size: 13px; font-weight: 700; display: flex; flex-direction: column; gap: 6px; }
+    input, select { padding: 12px 15px; border: 2px solid var(--line); border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s; width: 100%; }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15); }
+    
+    /* Toast */
+    .toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 10000; font-weight: bold; font-size: 14px; display: none; }
+    .toast-success { background: var(--success); color: white; }
+    .toast-error { background: var(--secondary); color: white; }
+    
+    #status-global { font-weight: 600; color: var(--muted); text-align: center; padding: 30px; }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notificações -->
+  <div id="toast-msg" class="toast"></div>
+
+  <main>
+    <!-- Navegação -->
+    <div class="nav">
+      <div class="nav-links">
+        <a href="/">Consulta TMSLOG</a>
+        <a href="/nova-acareacao">Nova Acareação</a>
+        <a href="/gestao">Gestão de Solicitações</a>
+        {% if perfil == 'Admin' %}
+        <a href="/dashboard">Dashboard</a>
+        <a href="/usuarios" class="active">Usuários</a>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:15px; align-items:center;">
+        <span style="font-size:13px; font-weight:bold; color:var(--muted)">Olá, {{ usuario }} ({{ perfil }})</span>
+        <a href="/logout" style="background:var(--secondary); color:#fff; border-color:var(--secondary)">Sair</a>
+      </div>
+    </div>
+
+    <!-- Cabeçalho -->
+    <header class="corporate-header">
+      <div class="logos">
+        <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'display:flex;align-items:center;font-weight:900;font-size:42px;color:var(--accent);letter-spacing:-2px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:24px;margin-left:4px;margin-top:-14px;\'>TD</span></div>'">
+      </div>
+      <div class="title-area">
+        <h1>Administração de Acessos</h1>
+        <p>Controle de usuários, perfis e credenciais do Portal</p>
+      </div>
+    </header>
+
+    <!-- Card Principal -->
+    <section class="card">
+      <div class="header-tabela">
+        <h2>Usuários do Sistema</h2>
+        <button class="btn btn-success" onclick="abrirModalNovo()">➕ Novo Usuário</button>
+      </div>
+
+      <div id="status-global">Carregando usuários...</div>
+
+      <div class="table-wrap" id="tabela-container" style="display:none;">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome Completo</th>
+              <th>E-mail Corporativo</th>
+              <th>Perfil / Acesso</th>
+              <th style="width: 180px; text-align: center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="usuarios-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Salvar Usuário (Novo / Editar) -->
+  <div class="modal-overlay" id="modal-usuario">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Novo Usuário</h3>
+        <button class="modal-close" onclick="fecharModal()">&times;</button>
+      </div>
+      <form id="form-usuario" onsubmit="salvarUsuario(event)">
+        <label>E-mail Corporativo
+          <input type="email" id="user-email" required placeholder="seuemail@jmdistribuicao.com.br">
+        </label>
+        <label>Nome Completo
+          <input type="text" id="user-nome" required placeholder="Nome do Usuário">
+        </label>
+        <label>Perfil de Acesso
+          <select id="user-perfil" required>
+            <option value="Usuario">Usuário Comum</option>
+            <option value="Admin">Administrador (ADM)</option>
+          </select>
+        </label>
+        <label>Senha
+          <div style="position: relative; margin-top: 5px;">
+            <input type="password" id="user-senha" placeholder="Senha do usuário" style="padding-right: 40px;">
+            <span onclick="togglePasswordVisibility('user-senha', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--muted); display: flex; align-items: center; justify-content: center; user-select: none;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </span>
+          </div>
+          <span id="senha-aviso" style="font-size:11px; color:var(--muted); font-weight:normal; margin-top:4px;"></span>
+        </label>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
+          <button type="button" class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let usuariosCadastrados = [];
+    const loggedUserEmail = "{{ session.get('usuario') }}";
+
+    window.addEventListener('DOMContentLoaded', carregarUsuarios);
+
+    async function carregarUsuarios() {
+      const statusGlobal = document.getElementById('status-global');
+      const tabelaContainer = document.getElementById('tabela-container');
+      const tbody = document.getElementById('usuarios-tbody');
+      
+      statusGlobal.style.display = 'block';
+      statusGlobal.textContent = 'Carregando usuários...';
+      tabelaContainer.style.display = 'none';
+      tbody.innerHTML = '';
+      
+      try {
+        const response = await fetch('/api/usuarios');
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.erro || 'Falha ao buscar usuários.');
+        
+        usuariosCadastrados = data;
+        
+        data.forEach(user => {
+          const tr = document.createElement('tr');
+          const badgeClass = user.Perfil === 'Admin' ? 'badge-admin' : 'badge-usuario';
+          
+          let botoesAcao = `
+            <button class="btn btn-primary btn-small" onclick="abrirModalEditar('${user.Email}')">✏️ Editar</button>
+            <button class="btn btn-danger btn-small" onclick="deletarUsuario('${user.Email}')">🗑️ Excluir</button>
+          `;
+          
+          if (user.Email === loggedUserEmail) {
+            botoesAcao = `
+              <button class="btn btn-primary btn-small" onclick="abrirModalEditar('${user.Email}')">✏️ Editar</button>
+              <span style="font-size:11px; color:var(--muted); font-weight:bold;">Sua Conta (Ativa)</span>
+            `;
+          }
+          
+          tr.innerHTML = `
+            <td style="font-weight:bold; color:var(--text);">${escapeHtml(user.Nome)}</td>
+            <td>${escapeHtml(user.Email)}</td>
+            <td><span class="badge ${badgeClass}">${user.Perfil}</span></td>
+            <td style="text-align:center; display:flex; gap:10px; justify-content:center; align-items:center;">
+              ${botoesAcao}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        
+        statusGlobal.style.display = 'none';
+        tabelaContainer.style.display = 'block';
+        
+      } catch (err) {
+        statusGlobal.textContent = err.message;
+        statusGlobal.style.color = 'var(--secondary)';
+      }
+    }
+
+    function showToast(mensagem, isError = false) {
+      const toast = document.getElementById('toast-msg');
+      toast.textContent = mensagem;
+      toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3500);
+    }
+
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+          </svg>
+        `;
+      } else {
+        input.type = 'password';
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        `;
+      }
+    }
+
+    function abrirModalNovo() {
+      document.getElementById('modal-titulo').textContent = 'Novo Usuário';
+      document.getElementById('user-email').value = '';
+      document.getElementById('user-email').disabled = false;
+      document.getElementById('user-nome').value = '';
+      document.getElementById('user-perfil').value = 'Usuario';
+      document.getElementById('user-senha').value = '';
+      document.getElementById('user-senha').required = true;
+      document.getElementById('user-senha').placeholder = 'Defina a senha inicial';
+      document.getElementById('senha-aviso').textContent = 'Mínimo de 6 caracteres.';
+      
+      document.getElementById('modal-usuario').classList.add('active');
+    }
+
+    function abrirModalEditar(email) {
+      const user = usuariosCadastrados.find(u => u.Email === email);
+      if (!user) return;
+      
+      document.getElementById('modal-titulo').textContent = 'Editar Usuário';
+      document.getElementById('user-email').value = user.Email;
+      document.getElementById('user-email').disabled = true;
+      document.getElementById('user-nome').value = user.Nome;
+      document.getElementById('user-perfil').value = user.Perfil;
+      document.getElementById('user-senha').value = '';
+      document.getElementById('user-senha').required = false;
+      document.getElementById('user-senha').placeholder = 'Digite para alterar a senha';
+      document.getElementById('senha-aviso').textContent = 'Deixe este campo em branco para manter a senha atual.';
+      
+      document.getElementById('modal-usuario').classList.add('active');
+    }
+
+    function fecharModal() {
+      document.getElementById('modal-usuario').classList.remove('active');
+    }
+
+    async function salvarUsuario(e) {
+      e.preventDefault();
+      const email = document.getElementById('user-email').value;
+      const nome = document.getElementById('user-nome').value;
+      const perfil = document.getElementById('user-perfil').value;
+      const senha = document.getElementById('user-senha').value;
+      const btn = document.getElementById('btn-submit');
+      
+      btn.disabled = true;
+      
+      try {
+        const response = await fetch('/api/usuarios/salvar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email, nome, perfil, senha})
+        });
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.erro || 'Falha ao salvar usuário.');
+        
+        showToast('✅ Usuário salvo com sucesso!');
+        fecharModal();
+        carregarUsuarios();
+        
+      } catch (err) {
+        showToast(err.message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deletarUsuario(email) {
+      if (!confirm(`Tem certeza que deseja excluir permanentemente o acesso do e-mail ${email}?`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/usuarios/deletar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({email})
+        });
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.erro || 'Falha ao excluir usuário.');
+        
+        showToast('✅ Usuário excluído com sucesso!');
+        carregarUsuarios();
+        
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function escapeHtml(v) {
+      const e = document.createElement('span');
+      e.textContent = v ?? '';
+      return e.innerHTML;
+    }
+  </script>
+</body>
+</html>
