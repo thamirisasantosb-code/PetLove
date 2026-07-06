@@ -355,15 +355,14 @@
       const nome = document.getElementById('user-nome').value;
       const perfil = document.getElementById('user-perfil').value;
       const senha = document.getElementById('user-senha').value;
-      const btn = document.getElementById('btn-submit');
-      
+      const isEdit = document.getElementById('user-email').disabled;
       btn.disabled = true;
       
       try {
         const response = await fetch('/api/usuarios/salvar', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({email, nome, perfil, senha})
+          body: JSON.stringify({email, nome, perfil, senha, is_edit: isEdit})
         });
         const data = await response.json();
         

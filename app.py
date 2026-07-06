@@ -466,10 +466,11 @@ def api_salvar_usuario():
         return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
         
     dados = request.get_json(silent=True) or {}
-    email = dados.get("email", "").strip()
+    email = dados.get("email", "").strip().lower()
     nome = dados.get("nome", "").strip()
     perfil = dados.get("perfil", "").strip()
     senha = dados.get("senha", "").strip()
+    is_edit = dados.get("is_edit", False)
     
     if not email or not nome or not perfil:
         return jsonify(erro="Preencha os campos obrigatórios (E-mail, Nome e Perfil)."), 400
@@ -482,6 +483,7 @@ def api_salvar_usuario():
     linhas = []
     editado = False
     campos = ["Email", "Senha", "Perfil", "Nome"]
+    email_existe = False
     
     if csv_path.exists():
         with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
@@ -489,14 +491,23 @@ def api_salvar_usuario():
             if leitor.fieldnames:
                 campos = leitor.fieldnames
             for row in leitor:
-                if row.get("Email") == email:
-                    row["Nome"] = nome
-                    row["Perfil"] = perfil
-                    if senha:
-                        row["Senha"] = senha
-                    editado = True
+                row_email = str(row.get("Email", "")).strip().lower()
+                if row_email == email:
+                    email_existe = True
+                    if is_edit:
+                        row["Nome"] = nome
+                        row["Perfil"] = perfil
+                        if senha:
+                            row["Senha"] = senha
+                        editado = True
                 linhas.append(row)
                 
+    if not is_edit and email_existe:
+        return jsonify(erro="Este e-mail de usuário já está cadastrado. Para alterá-lo, use o botão Editar na listagem."), 400
+        
+    if not editado and is_edit:
+        return jsonify(erro="Usuário para edição não encontrado no sistema."), 404
+        
     if not editado:
         # Novo usuário. Senha é obrigatória para novos usuários
         if not senha:
@@ -514,6 +525,8 @@ def api_salvar_usuario():
             escritor = csv.DictWriter(f, fieldnames=campos)
             escritor.writeheader()
             for row in linhas:
+                # Normalizar e-mail da gravação
+                row["Email"] = str(row.get("Email", "")).strip().lower()
                 escritor.writerow(row)
         return jsonify(sucesso=True)
     except Exception as e:
@@ -526,13 +539,13 @@ def api_deletar_usuario():
         return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
         
     dados = request.get_json(silent=True) or {}
-    email = dados.get("email", "").strip()
+    email = dados.get("email", "").strip().lower()
     
     if not email:
         return jsonify(erro="E-mail do usuário não informado."), 400
         
     # Impedir que o administrador delete a si mesmo
-    if email == session.get("usuario"):
+    if email == str(session.get("usuario")).strip().lower():
         return jsonify(erro="Você não pode excluir sua própria conta."), 400
         
     csv_path = BASE_DADOS_DIR / "usuarios.csv"
@@ -548,7 +561,8 @@ def api_deletar_usuario():
         if leitor.fieldnames:
             campos = leitor.fieldnames
         for row in leitor:
-            if row.get("Email") == email:
+            row_email = str(row.get("Email", "")).strip().lower()
+            if row_email == email:
                 deletado = True
                 continue
             linhas.append(row)
@@ -716,6 +730,103 @@ def api_sincronizar_tms():
         if erro:
             return jsonify(erro=erro), 400
         return jsonify(sucesso=True, total_novos=total_novos, total_lidos=total_lidos)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+def obter_inconsistencias():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM chamados")
+    rows = cursor.fetchall()
+    
+    colunas_db = [description[0] for description in cursor.description]
+    col_id_db = next((c for c in colunas_db if 'ID_do_Pedido' in c or 'ID_Pedido' in c), 'ID_do_Pedido')
+    
+    inconsistencias = []
+    for r in rows:
+        d = dict(r)
+        
+        # Mapeando chaves do dicionário para compatibilidade de nomes com acentos e espaços
+        d_clean = {}
+        for k, v in d.items():
+            k_clean = k.replace("_", " ").lower().strip()
+            d_clean[k_clean] = str(v or "").strip()
+            
+        pid = d_clean.get("id do pedido") or d_clean.get("id_pedido") or ""
+        data_carr = d_clean.get("data do carregamento") or d_clean.get("data_do_carregamento") or ""
+        motorista = d_clean.get("motorista") or ""
+        placa = d_clean.get("placa do veiculo") or d_clean.get("placa_do_veiculo") or d_clean.get("placa do veículo") or ""
+        criado = d.get("Criado_por") or d.get("Criado por") or ""
+        regional = d_clean.get("regional 2") or d_clean.get("regional") or ""
+        rota = d_clean.get("rota") or ""
+        
+        erros = []
+        
+        # 1. ID Pedido (deve ser numérico com 9 dígitos)
+        if not pid:
+            erros.append("ID do Pedido está em branco.")
+        elif not pid.isdigit() or len(pid) != 9:
+            erros.append(f"ID do Pedido inválido (deve ter 9 dígitos numéricos: '{pid}').")
+            
+        # 2. Data do Carregamento (deve ser DD/MM/AAAA)
+        if not data_carr:
+            erros.append("Data do Carregamento está em branco.")
+        elif len(data_carr) != 10 or '/' not in data_carr:
+            erros.append(f"Data do Carregamento com formato inválido (esperado DD/MM/AAAA, recebido: '{data_carr}').")
+            
+        # 3. Regional
+        if not regional:
+            erros.append("Regional está em branco.")
+            
+        # 4. Rota
+        if not rota:
+            erros.append("Rota está em branco.")
+            
+        # 5. Motorista
+        if not motorista:
+            erros.append("Motorista está em branco.")
+            
+        # 6. Placa (se preenchida, deve ter formato de placa brasileira ABC1234 ou ABC1D23)
+        if placa:
+            placa_clean = placa.replace("-", "").strip()
+            if len(placa_clean) != 7 or not placa_clean[:3].isalpha() or not (placa_clean[3:].isalnum()):
+                erros.append(f"Placa do veículo inválida (esperado ABC-1234 ou ABC1D23, recebido: '{placa}').")
+                
+        if erros:
+            inconsistencias.append({
+                "id": pid,
+                "criado_por": criado or "Não Informado",
+                "motorista": motorista or "Não Informado",
+                "data_carregamento": data_carr or "Não Informada",
+                "erros": erros,
+                "dados": {
+                    "Regional": regional,
+                    "Rota": rota,
+                    "Placa": placa,
+                    "Valor": d_clean.get("valor", "")
+                }
+            })
+            
+    conn.close()
+    return inconsistencias
+
+@app.route("/inconsistencias")
+@login_required
+def inconsistencias_dashboard():
+    if session.get("usuario") != "admin@jm.com":
+        return render_template("login.html", erro="Acesso não autorizado. Apenas o administrador principal (admin@jm.com) pode gerenciar inconsistências."), 403
+    return render_template("inconsistencias.html", usuario=session.get('nome'), perfil=session.get('perfil'))
+
+@app.route("/api/inconsistencias")
+@login_required
+def api_inconsistencias():
+    if session.get("usuario") != "admin@jm.com":
+        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+    try:
+        dados = obter_inconsistencias()
+        return jsonify(dados)
     except Exception as e:
         return jsonify(erro=str(e)), 500
 
