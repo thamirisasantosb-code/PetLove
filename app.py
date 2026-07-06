@@ -566,6 +566,148 @@ def api_deletar_usuario():
     except Exception as e:
         return jsonify(erro=f"Erro ao excluir usuário: {str(e)}"), 500
 
+def sincronizar_pasta_tms():
+    db_path = DB_PATH
+    tms_dir = BASE_DADOS_DIR / "Relatorio TMS"
+    
+    if not tms_dir.exists():
+        return 0, 0, "Pasta Relatorio TMS não encontrada."
+        
+    csv_files = list(tms_dir.glob("*.csv"))
+    if not csv_files:
+        return 0, 0, "Nenhum arquivo CSV encontrado na pasta Relatorio TMS."
+        
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    cursor = conn.cursor()
+    
+    # Obter colunas reais da tabela chamados
+    cursor.execute("SELECT * FROM chamados LIMIT 1")
+    colunas_db = [description[0] for description in cursor.description]
+    
+    # Ler pedidos existentes na base para evitar duplicados
+    cursor.execute("SELECT ID_do_Pedido FROM chamados")
+    pedidos_existentes = {str(r[0]).strip() for r in cursor.fetchall() if r[0]}
+    
+    total_novos = 0
+    total_lidos = 0
+    
+    for csv_file in csv_files:
+        delimiter = ','
+        with open(csv_file, newline='', encoding='utf-8-sig', errors='ignore') as f:
+            first_line = f.readline()
+            if first_line.count(';') > first_line.count(','):
+                delimiter = ';'
+            f.seek(0)
+            
+            leitor = csv.DictReader(f, delimiter=delimiter)
+            if not leitor.fieldnames:
+                continue
+                
+            for row in leitor:
+                total_lidos += 1
+                col_pedido = next((c for c in leitor.fieldnames if 'Pedido' in c), 'Pedido')
+                pedido_id = str(row.get(col_pedido, "")).strip()
+                
+                if not pedido_id or pedido_id in pedidos_existentes:
+                    continue
+                    
+                # Mapeando dados do CSV do TMS
+                data_carr_raw = row.get("Data_do_Carregamento_Lista", "")
+                if data_carr_raw and " " in data_carr_raw:
+                    data_carr = data_carr_raw.split(" ")[0].strip()
+                else:
+                    data_carr = data_carr_raw.strip()
+                    
+                motorista_raw = row.get("Motorista_Lista", "")
+                if " - " in motorista_raw:
+                    motorista = motorista_raw.split(" - ", 1)[1].strip()
+                else:
+                    motorista = motorista_raw.strip()
+                    
+                filial_raw = row.get("Filial_Entrega", "")
+                regional = filial_raw.strip()
+                if "São Paulo" in filial_raw: regional = "JM SP"
+                elif "Barueri" in filial_raw: regional = "JM BAR"
+                elif "Santos" in filial_raw: regional = "JM SSZ"
+                
+                lista_entrega = row.get("Lista_Entrega", "").strip()
+                ocorrencia = row.get("Ultima_Ocorrencia", "").strip()
+                data_ocorr_raw = row.get("Data_Ultima_Ocorrencia", "")
+                data_ocorr = data_ocorr_raw.split(" ")[0].strip() if " " in data_ocorr_raw else data_ocorr_raw.strip()
+                
+                # Montar o dicionário correspondente ao DB
+                dados_pedido = {}
+                for col in colunas_db:
+                    col_clean = col.replace("_", " ").lower()
+                    if "id do pedido" in col_clean or "id_pedido" in col_clean:
+                        dados_pedido[col] = pedido_id
+                    elif "criado por" in col_clean or "criado_por" in col_clean:
+                        dados_pedido[col] = "Carga TMS"
+                    elif "data do carregamento" in col_clean or "data_do_carregamento" in col_clean:
+                        dados_pedido[col] = data_carr
+                    elif "descricao da reclamacao" in col_clean or "descrição da reclamação" in col_clean or "descrição_da_reclamação" in col_clean:
+                        dados_pedido[col] = data_ocorr if data_ocorr else data_carr
+                    elif "motorista" in col_clean:
+                        dados_pedido[col] = motorista
+                    elif "placa" in col_clean:
+                        dados_pedido[col] = ""
+                    elif "rota" in col_clean:
+                        dados_pedido[col] = row.get("Rota_Entrega", "").strip()
+                    elif "regional" in col_clean:
+                        dados_pedido[col] = regional
+                    elif "valor" in col_clean:
+                        dados_pedido[col] = ""
+                    elif "justificativa" in col_clean:
+                        dados_pedido[col] = "Importado via Relatório TMS"
+                    elif "descricao da divergencia" in col_clean or "descrição da divergência" in col_clean or "descrição_da_divergência" in col_clean:
+                        dados_pedido[col] = ocorrencia
+                    elif "procedencia" in col_clean or "procedência" in col_clean:
+                        dados_pedido[col] = ""
+                    elif "responsavel" in col_clean or "responsável" in col_clean:
+                        dados_pedido[col] = ""
+                    elif "tratativa" in col_clean:
+                        dados_pedido[col] = ""
+                    elif "status da tratativa" in col_clean or "status_da_tratativa" in col_clean:
+                        dados_pedido[col] = "Em Andamento"
+                    elif "lista entrega cruzada" in col_clean or "lista_entrega_cruzada" in col_clean:
+                        dados_pedido[col] = lista_entrega
+                    else:
+                        dados_pedido[col] = ""
+                
+                placeholders = ", ".join(["?"] * len(colunas_db))
+                sql = f"INSERT INTO chamados ({', '.join([f'\"{c}\"' for c in colunas_db])}) VALUES ({placeholders})"
+                valores = [dados_pedido[c] for c in colunas_db]
+                cursor.execute(sql, valores)
+                
+                # Registrar histórico inicial da importação
+                import datetime
+                data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                cursor.execute("""
+                    INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (pedido_id, data_hora, "Carga TMS", "Importação", "N/A", f"Importado do arquivo {csv_file.name}"))
+                
+                pedidos_existentes.add(pedido_id)
+                total_novos += 1
+                
+    conn.commit()
+    conn.close()
+    return total_novos, total_lidos, None
+
+@app.route("/api/tms/sincronizar", methods=["POST"])
+@login_required
+def api_sincronizar_tms():
+    if session.get("usuario") != "admin@jm.com":
+        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+        
+    try:
+        total_novos, total_lidos, erro = sincronizar_pasta_tms()
+        if erro:
+            return jsonify(erro=erro), 400
+        return jsonify(sucesso=True, total_novos=total_novos, total_lidos=total_lidos)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
 def dict_from_row(row):
     d = dict(row)
     # Renomear as chaves de volta para o formato esperado pelo frontend

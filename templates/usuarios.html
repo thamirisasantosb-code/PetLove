@@ -135,7 +135,10 @@
     <section class="card">
       <div class="header-tabela">
         <h2>Usuários do Sistema</h2>
-        <button class="btn btn-success" onclick="abrirModalNovo()">➕ Novo Usuário</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary" onclick="sincronizarTMS(this)">🔄 Carregar TMS (Manual)</button>
+          <button class="btn btn-success" onclick="abrirModalNovo()">➕ Novo Usuário</button>
+        </div>
       </div>
 
       <div id="status-global">Carregando usuários...</div>
@@ -199,6 +202,31 @@
   <script>
     let usuariosCadastrados = [];
     const loggedUserEmail = "{{ session.get('usuario') }}";
+
+    async function sincronizarTMS(btn) {
+      if (!confirm("Deseja iniciar a importação manual dos relatórios da pasta Relatorio TMS?")) {
+        return;
+      }
+      
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = "🔄 Importando dados...";
+      
+      try {
+        const response = await fetch('/api/tms/sincronizar', { method: 'POST' });
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.erro || 'Falha na sincronização.');
+        
+        showToast(`✅ Sincronização concluída! ${data.total_novos} novos registros importados (${data.total_lidos} lidos).`);
+        
+      } catch (err) {
+        showToast(`❌ Erro ao sincronizar: ${err.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
 
     window.addEventListener('DOMContentLoaded', carregarUsuarios);
 
