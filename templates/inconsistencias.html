@@ -56,6 +56,7 @@
     th, td { padding: 14px 18px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
     th { background: #f8f9fa; font-weight: 700; color: var(--accent); }
     tr:hover td { background: rgba(94, 42, 132, 0.02); }
+    tbody tr { cursor: pointer; }
     
     /* Rules card */
     .rules-card { background: #fffaf0; border: 1px solid #feebc8; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; color: #7b341e; font-size: 13.5px; }
@@ -139,20 +140,25 @@
 
       <div id="status-global">Carregando inconsistências...</div>
 
-      <div class="table-wrap" id="tabela-container" style="display:none;">
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 130px;">ID Pedido</th>
-              <th>Criado Por</th>
-              <th>Motorista</th>
-              <th style="width: 120px;">Data Rec.</th>
-              <th>Erros Identificados</th>
-              <th style="width: 250px; text-align: center;">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="inconsistencias-tbody"></tbody>
-        </table>
+      <div id="tabela-container" style="display:none;">
+        <div style="font-size:12px; color:var(--muted); font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+          💡 Dica: Dê um duplo clique em qualquer linha da tabela para abrir a Gestão de Solicitações diretamente na edição do pedido.
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 130px;">ID Pedido</th>
+                <th>Criado Por</th>
+                <th>Motorista</th>
+                <th style="width: 120px;">Data Rec.</th>
+                <th>Erros Identificados</th>
+                <th style="width: 250px; text-align: center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="inconsistencias-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
   </main>
@@ -198,6 +204,11 @@
             `<li class="error-item">⚠️ ${err}</li>`
           ).join('');
           
+          tr.ondblclick = (e) => {
+            if (e.target.closest('button') || e.target.closest('a')) return;
+            window.location.href = `/gestao?busca=${item.id}`;
+          };
+
           tr.innerHTML = `
             <td style="font-weight:bold; color:var(--accent);">${item.id}</td>
             <td><strong>${item.criado_por}</strong></td>
