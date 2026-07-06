@@ -578,17 +578,43 @@ def sincronizar_pasta_tms():
         return 0, 0, "Nenhum arquivo CSV encontrado na pasta Relatorio TMS."
         
     conn = sqlite3.connect(db_path, timeout=30.0)
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
     # Obter colunas reais da tabela chamados
     cursor.execute("SELECT * FROM chamados LIMIT 1")
     colunas_db = [description[0] for description in cursor.description]
     
-    # Ler pedidos existentes na base para evitar duplicados
-    cursor.execute("SELECT ID_do_Pedido FROM chamados")
-    pedidos_existentes = {str(r[0]).strip() for r in cursor.fetchall() if r[0]}
+    # Obter todos os chamados existentes na base
+    cursor.execute("SELECT * FROM chamados")
+    rows = cursor.fetchall()
     
-    total_novos = 0
+    col_id_db = next((c for c in colunas_db if 'ID_do_Pedido' in c or 'ID_Pedido' in c), 'ID_do_Pedido')
+    
+    chamados_existentes = {}
+    for r in rows:
+        d = dict(r)
+        key_map = {}
+        for k in d.keys():
+            k_clean = k.replace("_", " ").lower()
+            if "id do pedido" in k_clean or "id_pedido" in k_clean:
+                key_map["id"] = k
+            elif "lista entrega cruzada" in k_clean or "lista_entrega_cruzada" in k_clean:
+                key_map["lista"] = k
+            elif "motorista" in k_clean:
+                key_map["motorista"] = k
+            elif "regional" in k_clean:
+                key_map["regional"] = k
+            elif "data do carregamento" in k_clean or "data_do_carregamento" in k_clean:
+                key_map["data_carr"] = k
+            elif "rota" in k_clean:
+                key_map["rota"] = k
+            elif "descricao da divergencia" in k_clean or "descrição da divergência" in k_clean or "descrição_da_divergência" in k_clean:
+                key_map["divergencia"] = k
+                
+        chamados_existentes[str(d.get(key_map.get("id", col_id_db), "")).strip()] = (d, key_map)
+        
+    total_atualizados = 0
     total_lidos = 0
     
     for csv_file in csv_files:
@@ -608,22 +634,19 @@ def sincronizar_pasta_tms():
                 col_pedido = next((c for c in leitor.fieldnames if 'Pedido' in c), 'Pedido')
                 pedido_id = str(row.get(col_pedido, "")).strip()
                 
-                if not pedido_id or pedido_id in pedidos_existentes:
+                if not pedido_id or pedido_id not in chamados_existentes:
                     continue
                     
-                # Mapeando dados do CSV do TMS
+                # O pedido existe na base! Vamos atualizar campos que estiverem em branco.
+                chamado_dict, key_map = chamados_existentes[pedido_id]
+                
+                # Preparar valores do TMS
                 data_carr_raw = row.get("Data_do_Carregamento_Lista", "")
-                if data_carr_raw and " " in data_carr_raw:
-                    data_carr = data_carr_raw.split(" ")[0].strip()
-                else:
-                    data_carr = data_carr_raw.strip()
-                    
+                data_carr = data_carr_raw.split(" ")[0].strip() if " " in data_carr_raw else data_carr_raw.strip()
+                
                 motorista_raw = row.get("Motorista_Lista", "")
-                if " - " in motorista_raw:
-                    motorista = motorista_raw.split(" - ", 1)[1].strip()
-                else:
-                    motorista = motorista_raw.strip()
-                    
+                motorista = motorista_raw.split(" - ", 1)[1].strip() if " - " in motorista_raw else motorista_raw.strip()
+                
                 filial_raw = row.get("Filial_Entrega", "")
                 regional = filial_raw.strip()
                 if "São Paulo" in filial_raw: regional = "JM SP"
@@ -632,67 +655,55 @@ def sincronizar_pasta_tms():
                 
                 lista_entrega = row.get("Lista_Entrega", "").strip()
                 ocorrencia = row.get("Ultima_Ocorrencia", "").strip()
-                data_ocorr_raw = row.get("Data_Ultima_Ocorrencia", "")
-                data_ocorr = data_ocorr_raw.split(" ")[0].strip() if " " in data_ocorr_raw else data_ocorr_raw.strip()
                 
-                # Montar o dicionário correspondente ao DB
-                dados_pedido = {}
-                for col in colunas_db:
-                    col_clean = col.replace("_", " ").lower()
-                    if "id do pedido" in col_clean or "id_pedido" in col_clean:
-                        dados_pedido[col] = pedido_id
-                    elif "criado por" in col_clean or "criado_por" in col_clean:
-                        dados_pedido[col] = "Carga TMS"
-                    elif "data do carregamento" in col_clean or "data_do_carregamento" in col_clean:
-                        dados_pedido[col] = data_carr
-                    elif "descricao da reclamacao" in col_clean or "descrição da reclamação" in col_clean or "descrição_da_reclamação" in col_clean:
-                        dados_pedido[col] = data_ocorr if data_ocorr else data_carr
-                    elif "motorista" in col_clean:
-                        dados_pedido[col] = motorista
-                    elif "placa" in col_clean:
-                        dados_pedido[col] = ""
-                    elif "rota" in col_clean:
-                        dados_pedido[col] = row.get("Rota_Entrega", "").strip()
-                    elif "regional" in col_clean:
-                        dados_pedido[col] = regional
-                    elif "valor" in col_clean:
-                        dados_pedido[col] = ""
-                    elif "justificativa" in col_clean:
-                        dados_pedido[col] = "Importado via Relatório TMS"
-                    elif "descricao da divergencia" in col_clean or "descrição da divergência" in col_clean or "descrição_da_divergência" in col_clean:
-                        dados_pedido[col] = ocorrencia
-                    elif "procedencia" in col_clean or "procedência" in col_clean:
-                        dados_pedido[col] = ""
-                    elif "responsavel" in col_clean or "responsável" in col_clean:
-                        dados_pedido[col] = ""
-                    elif "tratativa" in col_clean:
-                        dados_pedido[col] = ""
-                    elif "status da tratativa" in col_clean or "status_da_tratativa" in col_clean:
-                        dados_pedido[col] = "Em Andamento"
-                    elif "lista entrega cruzada" in col_clean or "lista_entrega_cruzada" in col_clean:
-                        dados_pedido[col] = lista_entrega
-                    else:
-                        dados_pedido[col] = ""
+                updates = {}
                 
-                placeholders = ", ".join(["?"] * len(colunas_db))
-                sql = f"INSERT INTO chamados ({', '.join([f'\"{c}\"' for c in colunas_db])}) VALUES ({placeholders})"
-                valores = [dados_pedido[c] for c in colunas_db]
-                cursor.execute(sql, valores)
-                
-                # Registrar histórico inicial da importação
-                import datetime
-                data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                cursor.execute("""
-                    INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (pedido_id, data_hora, "Carga TMS", "Importação", "N/A", f"Importado do arquivo {csv_file.name}"))
-                
-                pedidos_existentes.add(pedido_id)
-                total_novos += 1
-                
+                col_lista = key_map.get("lista")
+                if col_lista and not str(chamado_dict.get(col_lista, "")).strip():
+                    updates[col_lista] = lista_entrega
+                    
+                col_mot = key_map.get("motorista")
+                if col_mot and not str(chamado_dict.get(col_mot, "")).strip():
+                    updates[col_mot] = motorista
+                    
+                col_reg = key_map.get("regional")
+                if col_reg and not str(chamado_dict.get(col_reg, "")).strip():
+                    updates[col_reg] = regional
+                    
+                col_data = key_map.get("data_carr")
+                if col_data and not str(chamado_dict.get(col_data, "")).strip():
+                    updates[col_data] = data_carr
+                    
+                col_rota = key_map.get("rota")
+                if col_rota and not str(chamado_dict.get(col_rota, "")).strip():
+                    updates[col_rota] = row.get("Rota_Entrega", "").strip()
+                    
+                col_diverg = key_map.get("divergencia")
+                if col_diverg and not str(chamado_dict.get(col_diverg, "")).strip():
+                    updates[col_diverg] = ocorrencia
+                    
+                if updates:
+                    set_clause = ", ".join([f'"{k}" = ?' for k in updates.keys()])
+                    sql = f'UPDATE chamados SET {set_clause} WHERE "{col_id_db}" = ?'
+                    params = list(updates.values()) + [pedido_id]
+                    cursor.execute(sql, params)
+                    
+                    # Registrar histórico
+                    import datetime
+                    data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    for k, v in updates.items():
+                        cursor.execute("""
+                            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (pedido_id, data_hora, "Carga TMS", f"Atualizado: {k}", "", v))
+                        
+                    total_atualizados += 1
+                    for k, v in updates.items():
+                        chamado_dict[k] = v
+                        
     conn.commit()
     conn.close()
-    return total_novos, total_lidos, None
+    return total_atualizados, total_lidos, None
 
 @app.route("/api/tms/sincronizar", methods=["POST"])
 @login_required
