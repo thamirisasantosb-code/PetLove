@@ -370,7 +370,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const criadorParam = urlParams.get('criador');
     const cardStatusParam = urlParams.get('card_status');
+    const buscaParam = urlParams.get('busca');
     
+    if (buscaParam && idFilter) {
+      idFilter.value = buscaParam;
+    }
     if (criadorParam && criadorFilter) {
       criadorFilter.value = criadorParam;
     }
