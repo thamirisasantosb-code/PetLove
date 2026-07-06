@@ -909,6 +909,18 @@ def fluxo_novo():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Verificar duplicidade
+        pedido_clean = str(pedido).strip()
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido_clean,))
+        row_existente = cursor.fetchone()
+        if row_existente:
+            linha = dict_from_row(row_existente)
+            criador = linha.get("Criado por") or "não informado"
+            status = linha.get("Status da Tratativa") or "Em Andamento"
+            proc = linha.get("Procedência") or "Em Análise"
+            conn.close()
+            return jsonify(erro=f"O pedido {pedido_clean} já possui uma solicitação ativa. Cadastrada por: {criador} | Status: {status} | Procedência: {proc}."), 409
+            
         cursor.execute("SELECT * FROM chamados LIMIT 1")
         col_names = [description[0] for description in cursor.description]
         
