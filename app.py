@@ -1045,6 +1045,141 @@ def fluxo_atualizar_romaneio():
     except Exception as e:
         return jsonify(erro=str(e)), 500
 
+@app.post("/api/fluxo/deletar")
+@login_required
+def fluxo_deletar():
+    if session.get('usuario') != 'admin@jm.com':
+        return jsonify(erro="Apenas o administrador admin@jm.com pode excluir chamados."), 403
+        
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Deleta de chamados
+        cursor.execute("DELETE FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        # Deleta de historico
+        cursor.execute("DELETE FROM historico_chamados WHERE pedido_id = ?", (pedido,))
+        
+        conn.commit()
+        conn.close()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/fluxo/atualizar_campos_admin")
+@login_required
+def fluxo_atualizar_campos_admin():
+    if session.get('usuario') != 'admin@jm.com':
+        return jsonify(erro="Apenas o administrador admin@jm.com pode editar estes campos."), 403
+        
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Obter colunas reais do banco
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return jsonify(erro="Pedido não encontrado."), 404
+            
+        col_names = [description[0] for description in cursor.description]
+        
+        col_data_rota = next((c for c in col_names if 'Carregamento' in c or 'Data_do' in c), 'Data_do_Carregamento')
+        col_data_rec = next((c for c in col_names if 'Reclama' in c or 'Reclamacao' in c), 'Descrição_da_Reclamação')
+        col_motorista = next((c for c in col_names if 'Motorista' in c), 'Motorista')
+        col_placa = next((c for c in col_names if 'Placa' in c), 'Placa_do_veículo')
+        col_rota = next((c for c in col_names if 'Rota' in c), 'Rota')
+        col_regional = next((c for c in col_names if 'Regional' in c), 'Regional_2')
+        col_valor = next((c for c in col_names if 'Valor' in c), 'Valor')
+        col_cliente = next((c for c in col_names if 'Nome_do_cliente' in c or 'Cliente' in c), 'Nome_do_cliente')
+        col_endereco = next((c for c in col_names if 'Endereco' in c), 'Endereco_do_cliente')
+        col_romaneio = next((c for c in col_names if 'Lista_Entrega_Cruzada' in c), 'Lista_Entrega_Cruzada')
+        
+        # Formatar datas se enviadas em formato YYYY-MM-DD para DD/MM/YYYY
+        def formatar_data_br(dt):
+            if not dt: return ""
+            if "-" in dt:
+                partes = dt.split("-")
+                if len(partes) == 3:
+                    return f"{partes[2]}/{partes[1]}/{partes[0]}"
+            return dt
+            
+        data_rota = formatar_data_br(dados.get("data_rota"))
+        data_rec = formatar_data_br(dados.get("data_rec"))
+        
+        sql = f"""
+            UPDATE chamados
+            SET "{col_data_rota}" = ?,
+                "{col_data_rec}" = ?,
+                "{col_motorista}" = ?,
+                "{col_placa}" = ?,
+                "{col_rota}" = ?,
+                "{col_regional}" = ?,
+                "{col_valor}" = ?,
+                "{col_cliente}" = ?,
+                "{col_endereco}" = ?,
+                "{col_romaneio}" = ?
+            WHERE ID_do_Pedido = ?
+        """
+        
+        cursor.execute(sql, (
+            data_rota,
+            data_rec,
+            dados.get("motorista"),
+            dados.get("placa"),
+            dados.get("rota"),
+            dados.get("regional"),
+            dados.get("valor"),
+            dados.get("cliente"),
+            dados.get("endereco"),
+            dados.get("romaneio"),
+            pedido
+        ))
+        
+        # Registrar no histórico todas as mudanças de campos!
+        import datetime
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        usuario = session.get('nome', 'Administrador')
+        
+        valores_antigos = dict(row)
+        
+        def registrar_historico(campo, col_db, novo_val):
+            val_ant = str(valores_antigos.get(col_db) or "").strip()
+            val_nov = str(novo_val or "").strip()
+            if val_ant != val_nov:
+                cursor.execute("""
+                    INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (pedido, data_hora, usuario, campo, val_ant if val_ant else "Vazio", val_nov if val_nov else "Vazio"))
+                
+        registrar_historico("Data Carregamento", col_data_rota, data_rota)
+        registrar_historico("Data Reclamação", col_data_rec, data_rec)
+        registrar_historico("Motorista", col_motorista, dados.get("motorista"))
+        registrar_historico("Placa veículo", col_placa, dados.get("placa"))
+        registrar_historico("Rota", col_rota, dados.get("rota"))
+        registrar_historico("Regional", col_regional, dados.get("regional"))
+        registrar_historico("Valor", col_valor, dados.get("valor"))
+        registrar_historico("Nome Cliente", col_cliente, dados.get("cliente"))
+        registrar_historico("Endereço Cliente", col_endereco, dados.get("endereco"))
+        registrar_historico("Nº Romaneio", col_romaneio, dados.get("romaneio"))
+        
+        conn.commit()
+        conn.close()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
 def formatar_data_para_iso(dt_str):
     dt_str = str(dt_str).strip()
     if "/" in dt_str:

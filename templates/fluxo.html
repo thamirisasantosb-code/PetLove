@@ -76,7 +76,17 @@
   </section>
   
   <section id="area-detalhes" class="card hidden">
-    <h2 style="margin-top:0; color: var(--accent);">Detalhes da Solicitação</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top:0; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+      <h2 style="margin: 0; color: var(--accent);">Detalhes da Solicitação</h2>
+      {% if session.usuario == 'admin@jm.com' %}
+      <div style="display: flex; gap: 8px;">
+        <button id="btn-editar-admin" type="button" style="padding: 6px 12px; font-size: 13px; border-radius: 6px;">✏️ Editar Campos</button>
+        <button id="btn-salvar-admin" type="button" class="hidden" style="padding: 6px 12px; font-size: 13px; border-radius: 6px; background: #38a169;">💾 Salvar</button>
+        <button id="btn-cancelar-admin" type="button" class="hidden" style="padding: 6px 12px; font-size: 13px; border-radius: 6px; background: #cbd5e0; color: #2d3748;">Cancelar</button>
+        <button id="btn-excluir-admin" type="button" style="padding: 6px 12px; font-size: 13px; border-radius: 6px; background: var(--secondary);">🗑️ Excluir</button>
+      </div>
+      {% endif %}
+    </div>
     
     <div class="details-grid">
       <div class="detail-item">
@@ -132,6 +142,7 @@
 
 </main><script>
 const $ = s => document.querySelector(s);
+const usuarioLogado = "{{ session.usuario }}";
 let pedidoAtual = '';
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -217,8 +228,8 @@ $('#form-busca').addEventListener('submit', async event => {
     $('#tratativa').value = data['Tratativa'] || '';
     $('#procedencia').value = data['Procedência'] || '';
     
-    // Se já estiver analisado, bloqueia a tela
-    if (data['Responsavel'] && data['Responsavel'].trim() !== '') {
+    // Se já estiver analisado, bloqueia a tela, EXCETO para o admin@jm.com
+    if (data['Responsavel'] && data['Responsavel'].trim() !== '' && usuarioLogado !== 'admin@jm.com') {
         $('#tratativa').disabled = true;
         $('#procedencia').disabled = true;
         $('#btn-atualizar').disabled = true;
@@ -335,6 +346,142 @@ if (btnSaveRomaneio) {
     } finally {
       btnSaveRomaneio.disabled = false;
       btnCancelRomaneio.disabled = false;
+    }
+  });
+}
+
+// Lógica de Edição de Campos e Exclusão por Admin (admin@jm.com)
+const escapeHtml = v => { const e = document.createElement('span'); e.textContent = v ?? ''; return e.innerHTML; };
+const btnEditarAdmin = $('#btn-editar-admin');
+const btnSalvarAdmin = $('#btn-salvar-admin');
+const btnCancelarAdmin = $('#btn-cancelar-admin');
+const btnExcluirAdmin = $('#btn-excluir-admin');
+
+let originalValues = {};
+
+const camposAdmin = [
+  { id: 'det-romaneio', key: 'romaneio' },
+  { id: 'det-data-rota', key: 'data_rota', type: 'date' },
+  { id: 'det-data-rec', key: 'data_rec', type: 'date' },
+  { id: 'det-mot', key: 'motorista' },
+  { id: 'det-placa', key: 'placa' },
+  { id: 'det-rota', key: 'rota' },
+  { id: 'det-reg', key: 'regional' },
+  { id: 'det-valor', key: 'valor' },
+  { id: 'det-cliente', key: 'cliente' },
+  { id: 'det-endereco', key: 'endereco' }
+];
+
+if (btnEditarAdmin) {
+  btnEditarAdmin.addEventListener('click', () => {
+    const btnEditRom = $('#btn-edit-romaneio');
+    if (btnEditRom) btnEditRom.style.display = 'none';
+
+    camposAdmin.forEach(c => {
+      const el = $(`#${c.id}`);
+      const val = (el.textContent.trim() === '-' || el.textContent.trim() === 'Não encontrada' || el.textContent.trim() === 'Erro') ? '' : el.textContent.trim();
+      originalValues[c.id] = el.innerHTML;
+      
+      let inputVal = val;
+      if (c.type === 'date' && val.includes('/')) {
+        const [d, m, y] = val.split('/');
+        inputVal = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      
+      el.innerHTML = `<input id="input-admin-${c.key}" type="${c.type || 'text'}" value="${escapeHtml(inputVal)}" style="padding:4px 8px; font-size:13px; border-radius:6px; border:1px solid var(--line); width: 100%;">`;
+    });
+    
+    btnEditarAdmin.classList.add('hidden');
+    btnExcluirAdmin.classList.add('hidden');
+    btnSalvarAdmin.classList.remove('hidden');
+    btnCancelarAdmin.classList.remove('hidden');
+  });
+}
+
+if (btnCancelarAdmin) {
+  btnCancelarAdmin.addEventListener('click', () => {
+    camposAdmin.forEach(c => {
+      const el = $(`#${c.id}`);
+      if (originalValues[c.id] !== undefined) {
+        el.innerHTML = originalValues[c.id];
+      }
+    });
+    
+    const btnEditRom = $('#btn-edit-romaneio');
+    if (btnEditRom) btnEditRom.style.display = 'inline-flex';
+
+    btnEditarAdmin.classList.remove('hidden');
+    btnExcluirAdmin.classList.remove('hidden');
+    btnSalvarAdmin.classList.add('hidden');
+    btnCancelarAdmin.classList.add('hidden');
+  });
+}
+
+if (btnSalvarAdmin) {
+  btnSalvarAdmin.addEventListener('click', async () => {
+    btnSalvarAdmin.disabled = true;
+    btnCancelarAdmin.disabled = true;
+    
+    const payload = {
+      pedido: pedidoAtual,
+      romaneio: $('#input-admin-romaneio').value.trim(),
+      data_rota: $('#input-admin-data_rota').value.trim(),
+      data_rec: $('#input-admin-data_rec').value.trim(),
+      motorista: $('#input-admin-motorista').value.trim(),
+      placa: $('#input-admin-placa').value.trim(),
+      rota: $('#input-admin-rota').value.trim(),
+      regional: $('#input-admin-regional').value.trim(),
+      valor: $('#input-admin-valor').value.trim(),
+      cliente: $('#input-admin-cliente').value.trim(),
+      endereco: $('#input-admin-endereco').value.trim()
+    };
+    
+    try {
+      const response = await fetch('/api/fluxo/atualizar_campos_admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.erro || 'Falha ao salvar modificações.');
+      
+      btnSalvarAdmin.classList.add('hidden');
+      btnCancelarAdmin.classList.add('hidden');
+      btnEditarAdmin.classList.remove('hidden');
+      btnExcluirAdmin.classList.remove('hidden');
+      
+      const btnEditRom = $('#btn-edit-romaneio');
+      if (btnEditRom) btnEditRom.style.display = 'inline-flex';
+      
+      $('#form-busca').dispatchEvent(new Event('submit'));
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btnSalvarAdmin.disabled = false;
+      btnCancelarAdmin.disabled = false;
+    }
+  });
+}
+
+if (btnExcluirAdmin) {
+  btnExcluirAdmin.addEventListener('click', async () => {
+    if (!confirm('Tem certeza que deseja EXCLUIR PERMANENTEMENTE esta acareação/chamado e todo seu histórico do banco de dados?')) return;
+    
+    btnExcluirAdmin.disabled = true;
+    try {
+      const response = await fetch('/api/fluxo/deletar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pedido: pedidoAtual })
+      });
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.erro || 'Falha ao excluir o chamado.');
+      
+      alert('Solicitação excluída com sucesso!');
+      window.location.href = '/gestao';
+    } catch (err) {
+      alert(err.message);
+      btnExcluirAdmin.disabled = false;
     }
   });
 }
