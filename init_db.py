@@ -40,6 +40,7 @@ def init_db():
         # Criar a tabela 'chamados'
         # Usamos TEXT para tudo pois o CSV é flexível
         colunas_sql = ", ".join([f'"{col}" TEXT' for col in colunas_db])
+        colunas_sql += ', "Lista_Entrega_Cruzada" TEXT, "Status_da_Tratativa" TEXT, "Nome_do_cliente" TEXT, "Endereco_do_cliente" TEXT'
         
         cursor.execute(f'DROP TABLE IF EXISTS chamados')
         cursor.execute(f'CREATE TABLE chamados ({colunas_sql})')

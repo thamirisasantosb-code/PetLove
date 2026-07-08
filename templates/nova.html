@@ -29,6 +29,10 @@
     button:hover:not(:disabled){filter:brightness(1.1); transform:translateY(-1px);}
     
     #status{min-height:24px;margin-top:15px;color:var(--muted);font-weight:500;} #status.erro{color:var(--secondary)} #status.sucesso{color: #38a169;}
+    table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px;text-align:left}
+    th,td{padding:12px 15px;border-bottom:1px solid var(--line)}
+    th{background:#f8f9fa;color:var(--accent);font-weight:700}
+    .table-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:20px}
     @media(max-width:850px){form{grid-template-columns:1fr}}
   </style>
 </head>
@@ -60,9 +64,17 @@
     </div>
   </header>
 
+
   <section class="card">
     <form id="form-novo">
-      <label>ID do Pedido<input id="ID_do_Pedido" required placeholder="Ex: 123456789"></label>
+
+      
+      <label>ID do Pedido
+        <div style="display: flex; gap: 10px;">
+          <input id="ID_do_Pedido" required placeholder="Ex: 123456789" style="flex: 1;">
+          <button type="button" id="btn-buscar" style="padding: 13px 20px; white-space: nowrap;">Buscar</button>
+        </div>
+      </label>
       <label>Criado por (Seu Nome)<input id="Criado_por" required value="{{ usuario }}" readonly style="background:#f8f9fa; cursor:not-allowed;"></label>
       <label>Data do Carregamento / Rota<input id="Data_do_Carregamento" type="date" required></label>
       <label>Data da Reclamação<input id="Descricao_da_Reclamacao" type="date" required></label>
@@ -71,6 +83,8 @@
       <label>Rota<input id="Rota" required placeholder="Número da Rota"></label>
       <label>Regional<input id="Regional_2" required placeholder="Ex: JM SP"></label>
       <label>Valor (R$)<input id="Valor" placeholder="Ex: R$ 50,00"></label>
+      <label>Nome do cliente<input id="Nome_do_cliente" placeholder="Nome do Cliente"></label>
+      <label class="full-width">Endereço do cliente<input id="Endereco_do_cliente" placeholder="Endereço do Cliente"></label>
       <label class="full-width">Justificativa Inicial<textarea id="Justificativa" rows="3" required placeholder="Descreva o motivo da acareação..."></textarea></label>
       
       <button id="btn-cadastrar" type="submit" class="full-width">Cadastrar Solicitação</button>
@@ -102,6 +116,8 @@ $('#form-novo').addEventListener('submit', async event => {
     "Rota": $('#Rota').value,
     "Regional_2": $('#Regional_2').value,
     "Valor": $('#Valor').value,
+    "Nome_do_cliente": $('#Nome_do_cliente').value,
+    "Endereco_do_cliente": $('#Endereco_do_cliente').value,
     "Justificativa": $('#Justificativa').value,
     // Deixamos os outros vazios
     "Descrição da Divergência": "",
@@ -134,16 +150,22 @@ $('#form-novo').addEventListener('submit', async event => {
 // Logica de Autocompletar ao digitar/colar o ID do Pedido
 const idPedidoInput = $('#ID_do_Pedido');
 if (idPedidoInput) {
+  const btnBuscar = $('#btn-buscar');
   const triggerAuto = async () => {
     const pedido = idPedidoInput.value.trim();
     if (!pedido || pedido.length < 5) return;
     
+    if (btnBuscar) btnBuscar.disabled = true;
     const status = $('#status');
     status.className = '';
     status.textContent = 'Buscando informacoes do pedido nas bases...';
     
     try {
-      const response = await fetch(`/api/fluxo/autocompletar/${pedido}`);
+      const savedLogin = localStorage.getItem('petlove_login') || '';
+      const savedSenha = localStorage.getItem('petlove_senha') || '';
+      const queryParams = new URLSearchParams({ login: savedLogin, senha: savedSenha });
+      
+      const response = await fetch(`/api/fluxo/autocompletar/${pedido}?${queryParams.toString()}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.erro || 'Erro ao buscar dados.');
       
@@ -153,16 +175,34 @@ if (idPedidoInput) {
       if (data.Regional_2) $('#Regional_2').value = data.Regional_2;
       if (data.Valor) $('#Valor').value = data.Valor;
       if (data.Data_do_Carregamento) $('#Data_do_Carregamento').value = data.Data_do_Carregamento;
+      if (data.Nome_do_cliente) $('#Nome_do_cliente').value = data.Nome_do_cliente;
+      if (data.Endereco_do_cliente) $('#Endereco_do_cliente').value = data.Endereco_do_cliente;
       
-      status.textContent = '';
+      if (data.Lista_Entrega) {
+          status.className = 'sucesso';
+          status.textContent = 'Dados carregados! Romaneio: ' + data.Lista_Entrega;
+      } else {
+          status.textContent = '';
+      }
     } catch (err) {
       status.className = 'erro';
       status.textContent = 'Erro ao autocompletar dados: ' + err.message;
       setTimeout(() => { if (status.className === 'erro') status.textContent = ''; }, 4000);
+    } finally {
+      if (btnBuscar) btnBuscar.disabled = false;
     }
   };
   
+  if (btnBuscar) btnBuscar.addEventListener('click', triggerAuto);
   idPedidoInput.addEventListener('change', triggerAuto);
-  idPedidoInput.addEventListener('blur', triggerAuto);
+  
+  // E também buscar automaticamente enquanto a pessoa digita (se ela colar, por exemplo)
+  let typingTimer;
+  idPedidoInput.addEventListener('input', () => {
+    clearTimeout(typingTimer);
+    if (idPedidoInput.value.trim().length >= 8) {
+      typingTimer = setTimeout(triggerAuto, 800);
+    }
+  });
 }
 </script></body></html>

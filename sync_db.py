@@ -43,6 +43,20 @@ def sync_db():
     except sqlite3.OperationalError:
         pass
 
+    # Adicionar coluna Nome_do_cliente se nao existir
+    try:
+        cursor.execute("ALTER TABLE chamados ADD COLUMN Nome_do_cliente TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
+    # Adicionar coluna Endereco_do_cliente se nao existir
+    try:
+        cursor.execute("ALTER TABLE chamados ADD COLUMN Endereco_do_cliente TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
     # Identificar o delimitador do CSV analisando a primeira linha (cabeçalho)
     delimiter = ','
     with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:

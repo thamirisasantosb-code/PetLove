@@ -14,8 +14,138 @@ from openpyxl.utils import get_column_letter
 BASE_URL = "https://petlove.tmslog.com.br"
 DEFAULT_PAGE = f"{BASE_URL}/Imp_ListaPet.aspx?id=1049247"
 
+def buscar_dados_pedido_tms(pedido, login=None, senha=None):
+    if not login: login = os.getenv("TMSLOG_LOGIN")
+    if not senha: senha = os.getenv("TMSLOG_SENHA")
+    
+    if not login or not senha:
+        return None
+        
+    sessao = requests.Session()
+    sessao.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    })
+    
+    try:
+        entrada = sessao.get(f"{BASE_URL}/index.aspx", timeout=30)
+        entrada.raise_for_status()
+        resp_login = sessao.post(
+            f"{BASE_URL}/ws.asmx/login",
+            json={"usuario": login, "senha": senha},
+            headers={
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Origin": BASE_URL,
+                "Referer": entrada.url,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=30,
+        )
+        resp_login.raise_for_status()
+        if resp_login.json().get("d", {}).get("erro") != "ok":
+            return None
+            
+        payload = {
+            "id": 16,
+            "mail": "",
+            "nome": "",
+            "campos": "Pedido,Data do Carregamento Lista,Lista Entrega,Motorista Lista,Tipo do Veículo,Última Ocorrência,Data Última Ocorrência,Tipo da Ocorrência,Possui Comprovante,Filial Entrega,Rota Entrega,Usuario da Ocorrência",
+            "filtros": f"Pedido={pedido}",
+            "campocalculo": "",
+            "tipogroup": "0",
+            "tiposaida": "0"
+        }
+        
+        resp_busca = sessao.post(
+            f"{BASE_URL}/ws.asmx/pesquisarelatorio",
+            json=payload,
+            headers={
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Origin": BASE_URL,
+                "Referer": f"{BASE_URL}/rel_custom.aspx?id=16",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=60,
+        )
+        resp_busca.raise_for_status()
+        retorno = resp_busca.json().get("d", {})
+        if retorno.get("erro"): return None
+            
+        json_obj = json.loads(retorno.get("json0") or "{}")
+        if isinstance(json_obj, dict) and "valores" in json_obj:
+            registros = json_obj["valores"]
+        else:
+            registros = json_obj if isinstance(json_obj, list) else [json_obj]
+            
+        if registros and isinstance(registros, list) and len(registros) > 0:
+            return registros[0]
+    except Exception:
+        pass
+    return None
 
-def consultar_lista(numero, login, senha):
+def buscar_detalhes_remessa_tms(remessa_id, login=None, senha=None):
+    if not login: login = os.getenv("TMSLOG_LOGIN")
+    if not senha: senha = os.getenv("TMSLOG_SENHA")
+    if not login or not senha:
+        return None
+        
+    sessao = requests.Session()
+    sessao.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/150.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    })
+    
+    try:
+        entrada = sessao.get(f"{BASE_URL}/index.aspx", timeout=30)
+        entrada.raise_for_status()
+        resp_login = sessao.post(
+            f"{BASE_URL}/ws.asmx/login",
+            json={"usuario": login, "senha": senha},
+            headers={
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Origin": BASE_URL,
+                "Referer": entrada.url,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=30,
+        )
+        resp_login.raise_for_status()
+        if resp_login.json().get("d", {}).get("erro") != "ok":
+            return None
+            
+        resp_dados = sessao.post(
+            f"{BASE_URL}/ws.asmx/DetalhesRemessa",
+            json={"id": int(remessa_id)},
+            headers={
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Origin": BASE_URL,
+                "Referer": f"{BASE_URL}/det_remessa.aspx?id={remessa_id}",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=30,
+        )
+        resp_dados.raise_for_status()
+        retorno = resp_dados.json().get("d", {})
+        if retorno.get("erro"):
+            return None
+        
+        dados = json.loads(retorno.get("json0") or "{}")
+        return dados
+    except Exception:
+        pass
+    return None
+
+
+def buscar_romaneio_por_pedido(pedido, login=None, senha=None):
+    dados = buscar_dados_pedido_tms(pedido, login, senha)
+    if dados:
+        lista = dados.get("Lista Entrega") or dados.get("Lista_Entrega")
+        if lista:
+            return str(lista).strip()
+    return None
+
+
+def consultar_lista(numero, login, senha, pedido_alvo=None):
     if not str(numero).isdigit():
         raise ValueError("O número da lista deve conter somente dígitos.")
 
@@ -97,8 +227,15 @@ def consultar_lista(numero, login, senha):
     ]
     relacao = [[titulo for titulo, _ in campos]]
     for registro in registros:
+        if pedido_alvo and str(registro.get("pedido", "")).strip() != str(pedido_alvo).strip():
+            continue
         registro["lista_entrega"] = numero
         relacao.append([registro.get(chave, "") for _, chave in campos])
+    
+    # Se não encontrar o pedido alvo na lista, mas a lista existir, avisa.
+    if pedido_alvo and len(relacao) == 1:
+        raise RuntimeError(f"O pedido {pedido_alvo} não foi encontrado dentro da lista {numero}.")
+
     return [resumo, relacao]
 
 

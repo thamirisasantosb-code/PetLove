@@ -5,7 +5,7 @@ from uuid import uuid4
 from flask import Flask, jsonify, render_template, request, send_from_directory, session, redirect, url_for
 from functools import wraps
 import csv
-from exportar_petlove import consultar_lista, salvar_excel
+from exportar_petlove import consultar_lista, salvar_excel, buscar_romaneio_por_pedido, buscar_dados_pedido_tms
 
 BASE_DADOS_DIR = Path(os.getenv("BASE_DADOS_DIR", Path(__file__).parent / "Base de dados"))
 DB_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent / "petlove.db"))
@@ -26,8 +26,8 @@ def buscar_lista_por_pedido(pedido):
     if not base_dir.exists():
         return None
     
-    # Busca em arquivos CSV
-    for arquivo in base_dir.glob("*.csv"):
+    # Busca em arquivos CSV recursivamente (encontra na pasta Relatorio TMS)
+    for arquivo in base_dir.rglob("*.csv"):
         with open(arquivo, newline='', encoding='utf-8-sig', errors='ignore') as f:
             leitor = csv.DictReader(f, delimiter=';')
             # Se não encontrar a coluna, tenta vírgula
@@ -39,10 +39,10 @@ def buscar_lista_por_pedido(pedido):
                     if str(linha.get("Pedido", "")).strip() == pedido:
                         return str(linha.get("Lista_Entrega", "")).strip()
     
-    # Busca em arquivos XLSX
+    # Busca em arquivos XLSX recursivamente
     try:
         from openpyxl import load_workbook
-        for arquivo in base_dir.glob("*.xlsx"):
+        for arquivo in base_dir.rglob("*.xlsx"):
             wb = load_workbook(arquivo, data_only=True, read_only=True)
             for sheet in wb.sheetnames:
                 ws = wb[sheet]
@@ -148,11 +148,13 @@ def consultar():
         if numero_pedido:
             lista_entrega = buscar_lista_por_pedido(numero_pedido)
             if not lista_entrega:
-                return jsonify(erro=f"Pedido {numero_pedido} não encontrado na Base de dados. Verifique se o arquivo CSV/Excel está na pasta."), 404
+                lista_entrega = buscar_romaneio_por_pedido(numero_pedido, login, senha)
+            if not lista_entrega:
+                return jsonify(erro=f"Pedido {numero_pedido} não encontrado na Base de dados nem no TMS."), 404
         else:
             lista_entrega = numero_lista
 
-        tabelas = consultar_lista(lista_entrega, login, senha)
+        tabelas = consultar_lista(lista_entrega, login, senha, pedido_alvo=numero_pedido)
         nome = f"lista_{lista_entrega}_{uuid4().hex[:8]}.xlsx"
         nomes = ["Resumo da carga", "Relação da carga"]
         salvar_excel(tabelas, EXPORT_DIR / nome, nomes)
@@ -1053,6 +1055,24 @@ def formatar_data_para_iso(dt_str):
                 return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
     return dt_str
 
+def formatar_valor_reais(val):
+    if not val:
+        return ""
+    try:
+        val_str = str(val).replace(",", ".").strip()
+        val_float = float(val_str)
+        partes = f"{val_float:.2f}".split(".")
+        inteiro = partes[0]
+        decimal = partes[1]
+        inteiro_formatado = ""
+        for i, digito in enumerate(reversed(inteiro)):
+            if i > 0 and i % 3 == 0:
+                inteiro_formatado = "." + inteiro_formatado
+            inteiro_formatado = digito + inteiro_formatado
+        return f"R$ {inteiro_formatado},{decimal}"
+    except (ValueError, TypeError):
+        return str(val)
+
 @app.get("/api/fluxo/autocompletar/<pedido>")
 @login_required
 def fluxo_autocompletar(pedido):
@@ -1063,7 +1083,9 @@ def fluxo_autocompletar(pedido):
         "Rota": "",
         "Regional_2": "",
         "Valor": "",
-        "Data_do_Carregamento": ""
+        "Data_do_Carregamento": "",
+        "Nome_do_cliente": "",
+        "Endereco_do_cliente": ""
     }
     
     # 1. Buscar no banco SQLite
@@ -1079,6 +1101,8 @@ def fluxo_autocompletar(pedido):
             col_reg = next((c for c in colunas if 'Regional' in c), 'Regional_2')
             col_val = next((c for c in colunas if 'Valor' in c), 'Valor')
             col_data = next((c for c in colunas if 'Data' in c), 'Data_do_Carregamento')
+            col_cli = next((c for c in colunas if 'Nome_do_cliente' in c or 'Cliente' in c), 'Nome_do_cliente')
+            col_end = next((c for c in colunas if 'Endereco_do_cliente' in c or 'Endereco' in c), 'Endereco_do_cliente')
             
             if row[col_mot]: resultado["Motorista"] = str(row[col_mot]).strip()
             if row[col_placa]: resultado["Placa_do_veiculo"] = str(row[col_placa]).strip()
@@ -1086,8 +1110,10 @@ def fluxo_autocompletar(pedido):
             if row[col_reg]: resultado["Regional_2"] = str(row[col_reg]).strip()
             if row[col_val]: resultado["Valor"] = str(row[col_val]).strip()
             if row[col_data]: resultado["Data_do_Carregamento"] = formatar_data_para_iso(row[col_data])
+            if col_cli in colunas and row[col_cli]: resultado["Nome_do_cliente"] = str(row[col_cli]).strip()
+            if col_end in colunas and row[col_end]: resultado["Endereco_do_cliente"] = str(row[col_end]).strip()
             
-            if resultado["Motorista"] and resultado["Placa_do_veiculo"]:
+            if resultado["Motorista"] and resultado["Placa_do_veiculo"] and resultado["Valor"] and resultado["Nome_do_cliente"]:
                 return jsonify(resultado)
     except:
         pass
@@ -1123,42 +1149,113 @@ def fluxo_autocompletar(pedido):
     except:
         pass
 
-    # 3. Buscar no Relatorio TMS.csv
+    # 3. Buscar na pasta Relatorio TMS
     try:
-        csv_tms = BASE_DADOS_DIR / "Relatorio TMS.csv"
-        if csv_tms.exists():
-            delimiter = ','
-            with open(csv_tms, newline='', encoding='utf-8-sig', errors='ignore') as f:
-                first_line = f.readline()
-                if first_line.count(';') > first_line.count(','):
-                    delimiter = ';'
-                f.seek(0)
-                reader = csv.DictReader(f, delimiter=delimiter)
-                for row in reader:
-                    col_id = next((c for c in reader.fieldnames if 'Pedido' in c), 'Pedido')
-                    if str(row.get(col_id, "")).strip() == pedido:
-                        col_mot = next((c for c in reader.fieldnames if 'Motorista' in c), 'Motorista_Lista')
-                        col_rota = next((c for c in reader.fieldnames if 'Rota' in c), 'Rota_Entrega')
-                        col_reg = next((c for c in reader.fieldnames if 'Filial' in c), 'Filial_Entrega')
-                        col_data = next((c for c in reader.fieldnames if 'Carregamento' in c), 'Data_do_Carregamento_Lista')
-                        
-                        if row.get(col_mot) and not resultado["Motorista"]: resultado["Motorista"] = str(row[col_mot]).strip()
-                        if row.get(col_rota) and not resultado["Rota"]: resultado["Rota"] = str(row[col_rota]).strip()
-                        
-                        if row.get(col_reg) and not resultado["Regional_2"]: 
-                            reg_raw = str(row[col_reg]).strip()
-                            if "São Paulo" in reg_raw: resultado["Regional_2"] = "JM SP"
-                            elif "Barueri" in reg_raw: resultado["Regional_2"] = "JM BAR"
-                            elif "Santos" in reg_raw: resultado["Regional_2"] = "JM SSZ"
-                            else: resultado["Regional_2"] = reg_raw
+        tms_dir = BASE_DADOS_DIR / "Relatorio TMS"
+        if tms_dir.exists() and tms_dir.is_dir():
+            for csv_tms in tms_dir.glob("*.csv"):
+                delimiter = ','
+                with open(csv_tms, newline='', encoding='utf-8-sig', errors='ignore') as f:
+                    first_line = f.readline()
+                    if first_line.count(';') > first_line.count(','):
+                        delimiter = ';'
+                    f.seek(0)
+                    reader = csv.DictReader(f, delimiter=delimiter)
+                    if not reader.fieldnames: continue
+                    for row in reader:
+                        col_id = next((c for c in reader.fieldnames if 'Pedido' in c), 'Pedido')
+                        if str(row.get(col_id, "")).strip() == pedido:
+                            col_mot = next((c for c in reader.fieldnames if 'Motorista' in c), 'Motorista_Lista')
+                            col_rota = next((c for c in reader.fieldnames if 'Rota' in c), 'Rota_Entrega')
+                            col_reg = next((c for c in reader.fieldnames if 'Filial' in c), 'Filial_Entrega')
+                            col_data = next((c for c in reader.fieldnames if 'Carregamento' in c), 'Data_do_Carregamento_Lista')
                             
-                        if row.get(col_data) and not resultado["Data_do_Carregamento"]:
-                            dt = str(row[col_data]).strip()
-                            resultado["Data_do_Carregamento"] = formatar_data_para_iso(dt.split(" ")[0])
-                        break
+                            if row.get(col_mot) and not resultado["Motorista"]: resultado["Motorista"] = str(row[col_mot]).strip()
+                            if row.get(col_rota) and not resultado["Rota"]: resultado["Rota"] = str(row[col_rota]).strip()
+                            
+                            if row.get(col_reg) and not resultado["Regional_2"]: 
+                                reg_raw = str(row[col_reg]).strip()
+                                if "São Paulo" in reg_raw: resultado["Regional_2"] = "JM SP"
+                                elif "Barueri" in reg_raw: resultado["Regional_2"] = "JM BAR"
+                                elif "Santos" in reg_raw: resultado["Regional_2"] = "JM SSZ"
+                                else: resultado["Regional_2"] = reg_raw
+                                
+                            if row.get(col_data) and not resultado["Data_do_Carregamento"]:
+                                dt = str(row[col_data]).strip()
+                                resultado["Data_do_Carregamento"] = formatar_data_para_iso(dt.split(" ")[0])
+                            
+                            col_lista = next((c for c in reader.fieldnames if 'Lista' in c and 'Entrega' in c), 'Lista_Entrega')
+                            if row.get(col_lista) and not resultado.get("Lista_Entrega"):
+                                resultado["Lista_Entrega"] = str(row[col_lista]).strip()
+                            break
     except:
         pass
 
+    # 4. Buscar no TMS online (API TMSLOG)
+    if not all([resultado.get("Motorista"), resultado.get("Rota"), resultado.get("Regional_2"), resultado.get("Lista_Entrega")]) or not resultado.get("Valor"):
+        try:
+            tms_login = request.args.get("login", "")
+            tms_senha = request.args.get("senha", "")
+            
+            if tms_login and tms_senha:
+                tms_dados = buscar_dados_pedido_tms(pedido, login=tms_login, senha=tms_senha)
+                if tms_dados:
+                    remessa_id = tms_dados.get("id")
+                    if remessa_id:
+                        try:
+                            from exportar_petlove import buscar_detalhes_remessa_tms
+                            detalhes = buscar_detalhes_remessa_tms(remessa_id, tms_login, tms_senha)
+                            if detalhes:
+                                if detalhes.get("vlrnf") and not resultado.get("Valor"):
+                                    resultado["Valor"] = formatar_valor_reais(detalhes["vlrnf"])
+                                dest = detalhes.get("atores", [{}])[0].get("destinatario", [{}])[0]
+                                if dest:
+                                    if dest.get("NomeDestinatario") and not resultado.get("Nome_do_cliente"):
+                                        resultado["Nome_do_cliente"] = str(dest["NomeDestinatario"]).strip()
+                                    if dest.get("DsLogradouroDestinatario") and not resultado.get("Endereco_do_cliente"):
+                                        logr = str(dest["DsLogradouroDestinatario"]).strip()
+                                        num = str(dest.get("DsNumeroDestinatario") or "").strip()
+                                        resultado["Endereco_do_cliente"] = f"{logr} {num}".strip()
+                        except Exception as e:
+                            print(f"Erro ao buscar detalhes da remessa: {e}")
+
+                    lista_entrega = str(tms_dados.get("Lista_Entrega", "")).strip()
+                    if lista_entrega and not resultado.get("Lista_Entrega"):
+                        resultado["Lista_Entrega"] = lista_entrega
+                        
+                        try:
+                            from exportar_petlove import consultar_lista
+                            import re
+                            tabelas = consultar_lista(lista_entrega, tms_login, tms_senha)
+                            if tabelas and len(tabelas) > 0:
+                                info_carga = str(tabelas[0][1][4])
+                                
+                                match_placa = re.search(r"VEÍCULO:\s*([A-Z0-9]+)", info_carga, re.IGNORECASE)
+                                if match_placa and not resultado.get("Placa_do_veiculo"):
+                                    resultado["Placa_do_veiculo"] = match_placa.group(1).strip()
+                                    
+                                match_mot = re.search(r"MOTORISTA:\s*(.*?)\s*/", info_carga, re.IGNORECASE)
+                                if match_mot and not resultado.get("Motorista"):
+                                    resultado["Motorista"] = match_mot.group(1).strip()
+                        except Exception as e:
+                            print(f"Erro ao buscar detalhes da lista: {e}")
+                            
+                    if tms_dados.get("Motorista_Lista") and not resultado.get("Motorista"):
+                        resultado["Motorista"] = str(tms_dados["Motorista_Lista"]).strip()
+                    if tms_dados.get("Rota_Entrega") and not resultado.get("Rota"):
+                        resultado["Rota"] = str(tms_dados["Rota_Entrega"]).strip()
+                    if tms_dados.get("Filial_Entrega") and not resultado.get("Regional_2"):
+                        reg_raw = str(tms_dados["Filial_Entrega"]).strip()
+                        if "São Paulo" in reg_raw: resultado["Regional_2"] = "JM SP"
+                        elif "Barueri" in reg_raw: resultado["Regional_2"] = "JM BAR"
+                        elif "Santos" in reg_raw: resultado["Regional_2"] = "JM SSZ"
+                        else: resultado["Regional_2"] = reg_raw
+                    if tms_dados.get("Data_do_Carregamento_Lista") and not resultado.get("Data_do_Carregamento"):
+                        dt = str(tms_dados["Data_do_Carregamento_Lista"]).strip()
+                        resultado["Data_do_Carregamento"] = formatar_data_para_iso(dt.split(" ")[0])
+        except:
+            pass
+            
     return jsonify(resultado)
 
 @app.post("/api/fluxo/novo")

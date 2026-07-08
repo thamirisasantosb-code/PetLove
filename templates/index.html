@@ -19,9 +19,11 @@
     .title-area h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
     .title-area p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 500;}
     
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(94, 42, 132, 0.05)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(94, 42, 132, 0.05); margin-bottom:20px;}
     form{display:grid;grid-template-columns: 1fr 1fr auto auto;gap:16px;align-items:end} label{display:grid;gap:8px;color:var(--text);font-size:13px;font-weight:700}
-    input{width:100%;padding:13px 15px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-size:14px;outline:none;transition: border-color 0.2s, box-shadow 0.2s;} input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94, 42, 132, 0.15)}
+    #form-novo { grid-template-columns: 1fr 1fr; }
+    .full-width { grid-column: 1 / -1; }
+    input, select, textarea{width:100%;padding:13px 15px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-size:14px;outline:none;transition: border-color 0.2s, box-shadow 0.2s; font-family: inherit;} input:focus, textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94, 42, 132, 0.15)}
     button,.download{border:0;border-radius:10px;padding:14px 22px;background:var(--accent);color:#ffffff;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;transition:transform 0.1s, filter 0.2s;} button:disabled{opacity:.55;cursor:wait}
     .secondary{background:var(--line);color:var(--text);border:1px solid #cbd5e0;} button:hover:not(:disabled),.download:hover{filter:brightness(1.1); transform:translateY(-1px);}
     #status{min-height:24px;margin:18px 2px;color:var(--muted);font-weight:500;} #status.erro{color:var(--secondary)}.toolbar{display:flex;justify-content:space-between;align-items:center;margin:20px 0 16px;gap:12px}
@@ -67,7 +69,31 @@
     </form>
     <div id="status" aria-live="polite"></div>
   </section>
-  <section id="resultado" class="hidden"><div class="toolbar"><h2 id="titulo"></h2><a id="download" class="download">Baixar Excel</a></div><div id="tabelas"></div></section>
+  <section id="resultado" class="hidden">
+    <div class="toolbar"><h2 id="titulo"></h2><a id="download" class="download">Baixar Excel</a></div>
+    <div id="resumo-simplificado"></div>
+    <div id="tabelas"></div>
+  </section>
+  
+  <section id="acareacao-section" class="card hidden">
+    <form id="form-novo">
+      <label>ID do Pedido<input id="ID_do_Pedido" required placeholder="Ex: 123456789"></label>
+      <label>Criado por (Seu Nome)<input id="Criado_por" required value="{{ usuario }}" readonly style="background:#f8f9fa; cursor:not-allowed;"></label>
+      <label>Data do Carregamento / Rota<input id="Data_do_Carregamento" type="date" required></label>
+      <label>Data da Reclamação<input id="Descricao_da_Reclamacao" type="date" required></label>
+      <label>Motorista<input id="Motorista" required placeholder="Nome do motorista"></label>
+      <label>Placa do veículo<input id="Placa_do_veiculo" required placeholder="Ex: ABC1234"></label>
+      <label>Rota<input id="Rota" required placeholder="Número da Rota"></label>
+      <label>Regional<input id="Regional_2" required placeholder="Ex: JM SP"></label>
+      <label>Valor (R$)<input id="Valor" placeholder="Ex: R$ 50,00"></label>
+      <label>Nome do cliente<input id="Nome_do_cliente" placeholder="Nome do Cliente"></label>
+      <label class="full-width">Endereço do cliente<input id="Endereco_do_cliente" placeholder="Endereço do Cliente"></label>
+      <label class="full-width">Justificativa Inicial<textarea id="Justificativa" rows="3" required placeholder="Descreva o motivo da acareação..."></textarea></label>
+      
+      <button id="btn-cadastrar" type="submit" class="full-width">Cadastrar Solicitação</button>
+    </form>
+    <div id="status-form" style="margin-top: 15px; font-weight: 500; min-height: 20px;"></div>
+  </section>
 </main><script>
 const $=s=>document.querySelector(s), escapeHtml=v=>{const e=document.createElement('span');e.textContent=v??'';return e.innerHTML};
 // O botão Abrir no TMSLOG será desativado até a pesquisa trazer o número da lista
@@ -99,12 +125,111 @@ $('#form').addEventListener('submit',async event=>{
   localStorage.setItem('petlove_senha', $('#senha').value);
   
   const botao=$('#botao'),status=$('#status'); botao.disabled=true; status.className=''; status.textContent='Buscando dados e consultando o TMSLOG…'; $('#resultado').classList.add('hidden');
+  $('#resumo-simplificado').innerHTML = ''; // Limpa resumo anterior
   try{const response=await fetch('/consultar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pedido:$('#pedido').value,login:$('#login').value,senha:$('#senha').value.trim()})});
     const data=await response.json(); if(!response.ok)throw new Error(data.erro||'Falha na consulta.');
     listaEntregaAtual = data.lista;
     $('#titulo').textContent=`Pedido ${data.numero} (Lista ${data.lista})`; $('#download').href=data.download;
     $('#tabelas').innerHTML=data.tabelas.map((linhas,i)=>`<h3>${escapeHtml(data.nomes_tabelas?.[i]||`Tabela ${i+1}`)}</h3><div class="table-wrap"><table><thead><tr>${linhas[0].map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${linhas.slice(1).map(l=>`<tr>${l.map(c=>`<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
     status.textContent=`${data.tabelas.length} tabela(s) encontrada(s).`; $('#resultado').classList.remove('hidden');
+    
+    // Autocompletar form de Nova Acareação
+    const statusForm = $('#status-form');
+    statusForm.className = ''; statusForm.style.color = 'var(--text)'; statusForm.textContent = 'Buscando informações para o formulário...';
+    $('#acareacao-section').classList.remove('hidden');
+    
+    const queryParams = new URLSearchParams({ login: $('#login').value, senha: $('#senha').value.trim() });
+    const autoResp = await fetch(`/api/fluxo/autocompletar/${data.numero}?${queryParams.toString()}`);
+    const autoData = await autoResp.json();
+    
+    $('#ID_do_Pedido').value = data.numero;
+    if (autoResp.ok) {
+      if (autoData.Motorista) $('#Motorista').value = autoData.Motorista;
+      if (autoData.Placa_do_veiculo) $('#Placa_do_veiculo').value = autoData.Placa_do_veiculo;
+      if (autoData.Rota) $('#Rota').value = autoData.Rota;
+      if (autoData.Regional_2) $('#Regional_2').value = autoData.Regional_2;
+      if (autoData.Valor) $('#Valor').value = autoData.Valor;
+      if (autoData.Data_do_Carregamento) $('#Data_do_Carregamento').value = autoData.Data_do_Carregamento;
+      if (autoData.Nome_do_cliente) $('#Nome_do_cliente').value = autoData.Nome_do_cliente;
+      if (autoData.Endereco_do_cliente) $('#Endereco_do_cliente').value = autoData.Endereco_do_cliente;
+      statusForm.textContent = '';
+      
+      // Criar tabela Resumo Simplificado
+      const tr = `<tr>
+        <td>${escapeHtml(data.numero)}</td>
+        <td>${escapeHtml(data.lista)}</td>
+        <td>${escapeHtml(autoData.Data_do_Carregamento || '')}</td>
+        <td>${escapeHtml(autoData.Motorista || '')}</td>
+        <td>${escapeHtml(autoData.Placa_do_veiculo || '')}</td>
+        <td>${escapeHtml(autoData.Rota || '')}</td>
+        <td>${escapeHtml(autoData.Regional_2 || '')}</td>
+        <td>${escapeHtml(autoData.Valor || '')}</td>
+      </tr>`;
+      $('#resumo-simplificado').innerHTML = `<h3>Resumo do Pedido</h3><div class="table-wrap"><table>
+        <thead><tr>
+          <th>ID do Pedido</th><th>Romaneio</th><th>Data do Carregamento</th><th>Motorista</th><th>Placa do veículo</th><th>Rota</th><th>Regional</th><th>Valor (R$)</th>
+        </tr></thead>
+        <tbody>${tr}</tbody>
+      </table></div>`;
+      
+    } else {
+      statusForm.textContent = 'Aviso: ' + (autoData.erro || 'Não foi possível preencher todos os campos.');
+      statusForm.style.color = 'var(--secondary)';
+    }
+
   }catch(error){status.className='erro';status.textContent=location.protocol==='file:'?'Abra esta tela pelo servidor: execute “py app.py” e acesse http://127.0.0.1:5000.':error.message}finally{botao.disabled=false}
+});
+
+// Envio do Form de Nova Acareação
+$('#form-novo')?.addEventListener('submit', async event => {
+  event.preventDefault(); 
+  const btn = $('#btn-cadastrar'), status = $('#status-form');
+  btn.disabled = true; status.className = ''; status.style.color = 'var(--text)'; status.textContent = 'Cadastrando...';
+  
+  const formatDate = (val) => {
+    if (!val) return "";
+    const [y, m, d] = val.split("-");
+    return `${d}/${m}/${y}`;
+  };
+
+  const payload = {
+    "ID_do_Pedido": $('#ID_do_Pedido').value,
+    "Criado por": $('#Criado_por').value,
+    "Data do Carregamento": formatDate($('#Data_do_Carregamento').value),
+    "Descrição da Reclamação": formatDate($('#Descricao_da_Reclamacao').value),
+    "Motorista": $('#Motorista').value,
+    "Placa do veículo": $('#Placa_do_veiculo').value,
+    "Rota": $('#Rota').value,
+    "Regional_2": $('#Regional_2').value,
+    "Valor": $('#Valor').value,
+    "Nome_do_cliente": $('#Nome_do_cliente').value,
+    "Endereco_do_cliente": $('#Endereco_do_cliente').value,
+    "Justificativa": $('#Justificativa').value,
+    "Descrição da Divergência": "",
+    "Procedência": "",
+    "Responsavel": "",
+    "Tratativa": ""
+  };
+  
+  try {
+    const response = await fetch('/api/fluxo/novo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.erro || 'Falha ao cadastrar.');
+    
+    status.style.color = '#38a169';
+    status.textContent = 'Acareação cadastrada com sucesso!';
+    $('#form-novo').reset();
+    $('#ID_do_Pedido').value = '';
+    setTimeout(() => { $('#acareacao-section').classList.add('hidden'); }, 3000);
+  } catch (error) {
+    status.style.color = 'var(--secondary)'; status.textContent = error.message;
+  } finally {
+    btn.disabled = false;
+  }
 });
 </script></body></html>

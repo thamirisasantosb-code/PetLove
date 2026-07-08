@@ -100,6 +100,8 @@
       <div class="detail-item"><span class="detail-label">Regional</span><span class="detail-value" id="det-reg">-</span></div>
       <div class="detail-item"><span class="detail-label">Valor (R$)</span><span class="detail-value" id="det-valor" style="font-weight:900; color:var(--accent);">-</span></div>
       <div class="detail-item"><span class="detail-label">Status da Tratativa</span><span class="detail-value" id="det-status-tratativa" style="font-weight:900;">-</span></div>
+      <div class="detail-item"><span class="detail-label">Nome do Cliente</span><span class="detail-value" id="det-cliente">-</span></div>
+      <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Endereço do Cliente</span><span class="detail-value" id="det-endereco">-</span></div>
       <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Descrição da Divergência</span><span class="detail-value" id="det-divergencia" style="white-space: pre-wrap;">-</span></div>
       <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Justificativa</span><span class="detail-value" id="det-justificativa" style="white-space: pre-wrap;">-</span></div>
     </div>
@@ -191,6 +193,8 @@ $('#form-busca').addEventListener('submit', async event => {
     $('#det-rota').textContent = data['Rota'] || '-';
     $('#det-reg').textContent = data['Regional_2'] || '-';
     $('#det-valor').textContent = data['Valor'] || '-';
+    $('#det-cliente').textContent = (data['Nome_do_cliente'] || data['Nome do cliente']) || '-';
+    $('#det-endereco').textContent = (data['Endereco_do_cliente'] || data['Endereco do cliente']) || '-';
     $('#det-divergencia').textContent = data['Descrição da Divergência'] || '-';
     $('#det-justificativa').textContent = data['Justificativa'] || '-';
     
