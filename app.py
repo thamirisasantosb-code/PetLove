@@ -1,8 +1,13 @@
 import os
+import datetime
+import sqlite3
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Flask, jsonify, render_template, request, send_from_directory, session, redirect, url_for
+from flask import Flask, jsonify, render_template, request, send_from_directory, session, redirect, url_for, g, has_app_context
 from functools import wraps
 import csv
 from exportar_petlove import consultar_lista, salvar_excel, buscar_romaneio_por_pedido, buscar_dados_pedido_tms
@@ -11,7 +16,7 @@ BASE_DADOS_DIR = Path(os.getenv("BASE_DADOS_DIR", Path(__file__).parent / "Base 
 DB_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent / "petlove.db"))
 
 app = Flask(__name__)
-app.secret_key = "petlove_jm_secret_key_2026"
+app.secret_key = os.getenv("SECRET_KEY", "petlove_jm_secret_key_2026_" + str(os.urandom(8).hex()))
 
 def login_required(f):
     @wraps(f)
@@ -182,13 +187,27 @@ def baixar(nome):
 def fluxo():
     return render_template("fluxo.html", login_padrao=os.getenv("TMSLOG_LOGIN", ""), usuario=session.get('nome'), perfil=session.get('perfil'))
 
-import sqlite3
+# sqlite3 já importado no topo do arquivo
 
 def get_db_connection():
     db_path = DB_PATH
     conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
     return conn
+
+def get_db():
+    if not has_app_context():
+        return get_db_connection()
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = get_db_connection()
+    return db
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
 
 # Criar tabela de recuperação de senha se não existir
 try:
@@ -235,9 +254,7 @@ def atualizar_senha_csv(email, nova_senha):
         return True
     return False
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+# smtplib e email.mime já importados no topo do arquivo
 
 def enviar_email_recuperacao(email, senha_provisoria, link_confirmacao):
     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -338,13 +355,12 @@ def api_esqueci_senha():
     
     # Salva no SQLite
     try:
-        conn = get_db_connection()
+        conn = get_db()
         conn.execute(
             "INSERT INTO recuperacao_senha (email, token, senha_provisoria, data_criacao) VALUES (?, ?, ?, ?)",
             (email, token, senha_provisoria, data_criacao)
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         return jsonify(erro=f"Erro ao salvar solicitação: {str(e)}"), 500
         
@@ -365,11 +381,10 @@ def confirmar_recuperacao():
         return render_template("login.html", erro="Link de confirmação inválido ou incompleto.")
         
     try:
-        conn = get_db_connection()
+        conn = get_db()
         row = conn.execute("SELECT * FROM recuperacao_senha WHERE email = ? AND token = ?", (email, token)).fetchone()
         
         if not row:
-            conn.close()
             return render_template("login.html", erro="Token de confirmação inválido ou já utilizado.")
             
         senha_provisoria = row["senha_provisoria"]
@@ -393,7 +408,6 @@ def confirmar_recuperacao():
         # Deleta a entrada de recuperação
         conn.execute("DELETE FROM recuperacao_senha WHERE email = ? AND token = ?", (email, token))
         conn.commit()
-        conn.close()
         
         # Loga o usuário temporariamente e obriga a redefinir a senha
         session['usuario'] = email
@@ -457,8 +471,7 @@ def api_listar_usuarios():
             usuarios.append({
                 "Email": row.get("Email"),
                 "Nome": row.get("Nome"),
-                "Perfil": row.get("Perfil"),
-                "Senha": row.get("Senha")
+                "Perfil": row.get("Perfil")
             })
     return jsonify(usuarios)
 
@@ -594,8 +607,7 @@ def sincronizar_pasta_tms():
     if not csv_files:
         return 0, 0, "Nenhum arquivo CSV encontrado na pasta Relatorio TMS."
         
-    conn = sqlite3.connect(db_path, timeout=30.0)
-    conn.row_factory = sqlite3.Row
+    conn = get_db()
     cursor = conn.cursor()
     
     # Obter colunas reais da tabela chamados
@@ -719,7 +731,6 @@ def sincronizar_pasta_tms():
                         chamado_dict[k] = v
                         
     conn.commit()
-    conn.close()
     return total_atualizados, total_lidos, None
 
 @app.route("/api/tms/sincronizar", methods=["POST"])
@@ -737,8 +748,7 @@ def api_sincronizar_tms():
         return jsonify(erro=str(e)), 500
 
 def obter_inconsistencias():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = get_db()
     cursor = conn.cursor()
     
     cursor.execute("SELECT * FROM chamados")
@@ -812,7 +822,6 @@ def obter_inconsistencias():
                 }
             })
             
-    conn.close()
     return inconsistencias
 
 @app.route("/inconsistencias")
@@ -883,9 +892,8 @@ def dict_from_row(row):
 @login_required
 def fluxo_buscar(pedido):
     try:
-        conn = get_db_connection()
+        conn = get_db()
         row = conn.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (str(pedido).strip(),)).fetchone()
-        conn.close()
         
         if row:
             linha = dict_from_row(row)
@@ -905,9 +913,7 @@ def fluxo_buscar(pedido):
             
             # Adicionar histórico de modificações do pedido
             try:
-                conn_hist = get_db_connection()
-                hist_rows = conn_hist.execute("SELECT data_hora, usuario, campo, valor_antigo, valor_novo FROM historico_chamados WHERE pedido_id = ? ORDER BY id DESC", (str(pedido).strip(),)).fetchall()
-                conn_hist.close()
+                hist_rows = conn.execute("SELECT data_hora, usuario, campo, valor_antigo, valor_novo FROM historico_chamados WHERE pedido_id = ? ORDER BY id DESC", (str(pedido).strip(),)).fetchall()
                 linha['Historico'] = [dict(r) for r in hist_rows]
             except Exception as e:
                 linha['Historico'] = []
@@ -929,14 +935,13 @@ def fluxo_atualizar():
         return jsonify(erro="Pedido não informado."), 400
         
     try:
-        conn = get_db_connection()
+        conn = get_db()
         cursor = conn.cursor()
         
         # 1. Buscar valores antigos para o histórico
         cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
         row_antiga = cursor.fetchone()
         if not row_antiga:
-            conn.close()
             return jsonify(erro="Pedido não encontrado no fluxo."), 404
             
         col_names = [description[0] for description in cursor.description]
@@ -960,14 +965,17 @@ def fluxo_atualizar():
         was_finalizado = valores_antigos.get(col_status) and str(valores_antigos.get(col_status)).strip().lower() == 'finalizado'
         
         proc_clean = nova_proc.strip().lower() if nova_proc else ""
-        if proc_clean and proc_clean not in ["em analise", "em análise"] and nova_trat.strip():
+        trat_clean = nova_trat.strip() if nova_trat else ""
+        resp_clean = novo_resp.strip() if novo_resp else ""
+        
+        # Determinar se o chamado deve estar finalizado
+        tem_procedencia_valida = proc_clean and proc_clean not in ["em analise", "em análise"]
+        if resp_clean or trat_clean or tem_procedencia_valida:
             novo_status = "Finalizado"
         elif was_finalizado:
-            # Se já estava Finalizado, mantém Finalizado a menos que ambos os campos de procedência e tratativa sejam limpos
-            if not proc_clean and not nova_trat.strip():
-                novo_status = "Em Andamento"
-            else:
-                novo_status = "Finalizado"
+            # PROTEÇÃO: Se já estava Finalizado, mantém Finalizado por segurança
+            # Impede regressão acidental de status
+            novo_status = "Finalizado"
         else:
             novo_status = "Em Andamento"
             
@@ -996,7 +1004,7 @@ def fluxo_atualizar():
         ))
         
         # 3. Registrar modificações no histórico
-        import datetime
+        # datetime já importado no topo do arquivo
         data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         
         def log_mudanca(campo, valor_ant, valor_nov):
@@ -1017,7 +1025,6 @@ def fluxo_atualizar():
         log_mudanca("Status da Tratativa", valores_antigos.get(col_status), novo_status)
         
         conn.commit()
-        conn.close()
         return jsonify(sucesso=True)
     except Exception as e:
         return jsonify(erro=str(e)), 500
@@ -1034,13 +1041,12 @@ def fluxo_atualizar_romaneio():
         return jsonify(erro="Pedido não informado."), 400
         
     try:
-        conn = get_db_connection()
+        conn = get_db()
         cursor = conn.cursor()
         
         cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
         row = cursor.fetchone()
         if not row:
-            conn.close()
             return jsonify(erro="Pedido não encontrado."), 404
             
         col_names = [description[0] for description in cursor.description]
@@ -1050,14 +1056,13 @@ def fluxo_atualizar_romaneio():
         valor_antigo = valores_antigos.get(col_romaneio) or ""
         
         if str(valor_antigo).strip() == novo_romaneio:
-            conn.close()
             return jsonify(sucesso=True)
             
         # Executa atualização
         cursor.execute(f'UPDATE chamados SET "{col_romaneio}" = ? WHERE ID_do_Pedido = ?', (novo_romaneio, pedido))
         
         # Registrar no histórico
-        import datetime
+        # datetime já importado no topo do arquivo
         data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         cursor.execute("""
             INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
@@ -1065,7 +1070,6 @@ def fluxo_atualizar_romaneio():
         """, (pedido, data_hora, usuario, "Nº Romaneio", valor_antigo if valor_antigo else "Vazio/Erro", novo_romaneio))
         
         conn.commit()
-        conn.close()
         return jsonify(sucesso=True)
     except Exception as e:
         return jsonify(erro=str(e)), 500
@@ -1082,7 +1086,7 @@ def fluxo_deletar():
         return jsonify(erro="Pedido não informado."), 400
         
     try:
-        conn = get_db_connection()
+        conn = get_db()
         cursor = conn.cursor()
         
         # Deleta de chamados
@@ -1091,7 +1095,6 @@ def fluxo_deletar():
         cursor.execute("DELETE FROM historico_chamados WHERE pedido_id = ?", (pedido,))
         
         conn.commit()
-        conn.close()
         return jsonify(sucesso=True)
     except Exception as e:
         return jsonify(erro=str(e)), 500
@@ -1108,14 +1111,13 @@ def fluxo_atualizar_campos_admin():
         return jsonify(erro="Pedido não informado."), 400
         
     try:
-        conn = get_db_connection()
+        conn = get_db()
         cursor = conn.cursor()
         
         # Obter colunas reais do banco
         cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
         row = cursor.fetchone()
         if not row:
-            conn.close()
             return jsonify(erro="Pedido não encontrado."), 404
             
         col_names = [description[0] for description in cursor.description]
@@ -1173,7 +1175,7 @@ def fluxo_atualizar_campos_admin():
         ))
         
         # Registrar no histórico todas as mudanças de campos!
-        import datetime
+        # datetime já importado no topo do arquivo
         data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         usuario = session.get('nome', 'Administrador')
         
@@ -1200,7 +1202,6 @@ def fluxo_atualizar_campos_admin():
         registrar_historico("Nº Romaneio", col_romaneio, dados.get("romaneio"))
         
         conn.commit()
-        conn.close()
         return jsonify(sucesso=True)
     except Exception as e:
         return jsonify(erro=str(e)), 500
@@ -1250,9 +1251,8 @@ def fluxo_autocompletar(pedido):
     
     # 1. Buscar no banco SQLite
     try:
-        conn = get_db_connection()
+        conn = get_db()
         row = conn.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,)).fetchone()
-        conn.close()
         if row:
             colunas = row.keys() if hasattr(row, 'keys') else []
             col_mot = next((c for c in colunas if 'Motorista' in c), 'Motorista')
@@ -1427,7 +1427,7 @@ def fluxo_novo():
         return jsonify(erro="ID do Pedido é obrigatório."), 400
         
     try:
-        conn = get_db_connection()
+        conn = get_db()
         cursor = conn.cursor()
         
         # Verificar duplicidade
@@ -1439,7 +1439,6 @@ def fluxo_novo():
             criador = linha.get("Criado por") or "não informado"
             status = linha.get("Status da Tratativa") or "Em Andamento"
             proc = linha.get("Procedência") or "Em Análise"
-            conn.close()
             return jsonify(erro=f"O pedido {pedido_clean} já possui uma solicitação ativa. Cadastrada por: {criador} | Status: {status} | Procedência: {proc}."), 409
             
         cursor.execute("SELECT * FROM chamados LIMIT 1")
@@ -1463,7 +1462,6 @@ def fluxo_novo():
             
         cursor.execute(sql, valores)
         conn.commit()
-        conn.close()
         return jsonify(sucesso=True)
     except Exception as e:
         return jsonify(erro=str(e)), 500
@@ -1472,9 +1470,8 @@ def fluxo_novo():
 @login_required
 def fluxo_todos():
     try:
-        conn = get_db_connection()
+        conn = get_db()
         rows = conn.execute("SELECT * FROM chamados").fetchall()
-        conn.close()
         
         linhas = [dict_from_row(row) for row in rows]
         return jsonify(linhas)

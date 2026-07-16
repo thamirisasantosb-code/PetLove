@@ -126,6 +126,7 @@
           <option value="">Selecione...</option>
           <option value="Procedente">Procedente</option>
           <option value="Não Procedente">Não Procedente</option>
+          <option value="Em Análise">Em Análise</option>
         </select>
       </label>
       <button id="btn-atualizar" type="button" class="full-width">Salvar e Atualizar</button>
@@ -228,8 +229,23 @@ $('#form-busca').addEventListener('submit', async event => {
         $('#det-status-tratativa').style.width = 'fit-content';
     }
     
+    // Guardar dados originais do banco para uso seguro no payload
+    window._dadosOriginais = data;
+    
     $('#tratativa').value = data['Tratativa'] || '';
-    $('#procedencia').value = data['Procedência'] || '';
+    
+    // Setar dropdown de procedência com fallback para valores desconhecidos
+    const procValue = data['Procedência'] || '';
+    const selectProc = $('#procedencia');
+    selectProc.value = procValue;
+    // Se o valor não correspondeu a nenhuma opção, adicionar dinamicamente
+    if (selectProc.selectedIndex === -1 || (procValue && selectProc.value !== procValue)) {
+      const optionExtra = document.createElement('option');
+      optionExtra.value = procValue;
+      optionExtra.textContent = procValue;
+      selectProc.appendChild(optionExtra);
+      selectProc.value = procValue;
+    }
     
     // Se já estiver analisado, bloqueia a tela, EXCETO para o admin@jm.com
     if (data['Responsavel'] && data['Responsavel'].trim() !== '' && usuarioLogado !== 'admin@jm.com') {
@@ -262,13 +278,14 @@ $('#btn-atualizar').addEventListener('click', async () => {
   btn.disabled = true; status.className = ''; status.textContent = 'Salvando atualizações...';
   
   try {
+    const dadosOrig = window._dadosOriginais || {};
     const payload = {
       pedido: pedidoAtual,
       responsavel: "{{ usuario }}",
-      justificativa: $('#det-justificativa').textContent !== '-' ? $('#det-justificativa').textContent : '',
-      divergencia: $('#det-divergencia').textContent !== '-' ? $('#det-divergencia').textContent : '',
+      justificativa: dadosOrig['Justificativa'] || '',
+      divergencia: dadosOrig['Descrição da Divergência'] || '',
       tratativa: $('#tratativa').value,
-      valor: $('#det-valor').textContent !== '-' ? $('#det-valor').textContent : '',
+      valor: dadosOrig['Valor'] || '',
       procedencia: $('#procedencia').value
     };
     

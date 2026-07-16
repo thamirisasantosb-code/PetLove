@@ -99,7 +99,7 @@ def sync_db():
         cursor.execute("SELECT DISTINCT pedido_id FROM historico_chamados")
         pedidos_com_historico = {str(r[0]).strip() for r in cursor.fetchall() if r[0]}
 
-        # 1. DE-DUPLICAR E LIMPAR O BANCO DE DADOS ATUAL
+        # 1. DE-DUPLICAR O BANCO DE DADOS ATUAL (usando tabela temporária para segurança)
         cursor.execute("SELECT * FROM chamados")
         db_rows = cursor.fetchall()
         
@@ -155,16 +155,33 @@ def sync_db():
                 if is_treated and not existing_treated:
                     db_dict[ped_id] = row
 
-        # Recriar a tabela chamados limpa e reinserir os registros de-duplicados
-        cursor.execute("DELETE FROM chamados")
-        
-        placeholders_reais = ", ".join(["?"] * len(colunas_reais))
+        # SEGURO: Usar tabela temporária em vez de DELETE direto
         colunas_reais_str = ", ".join([f'"{c}"' for c in colunas_reais])
-        sql_insert_db = f'INSERT INTO chamados ({colunas_reais_str}) VALUES ({placeholders_reais})'
+        placeholders_reais = ", ".join(["?"] * len(colunas_reais))
         
+        cursor.execute(f"DROP TABLE IF EXISTS chamados_staging")
+        colunas_create = ", ".join([f'"{c}" TEXT' for c in colunas_reais])
+        cursor.execute(f"CREATE TABLE chamados_staging ({colunas_create})")
+        
+        sql_insert_staging = f'INSERT INTO chamados_staging ({colunas_reais_str}) VALUES ({placeholders_reais})'
         for row in db_dict.values():
-            cursor.execute(sql_insert_db, row)
-        print(f"Limpeza concluída: Banco de dados de-duplicado para {len(db_dict)} registros únicos.")
+            cursor.execute(sql_insert_staging, row)
+        
+        # Verificar se a staging tem os mesmos registros antes de substituir
+        cursor.execute("SELECT COUNT(*) FROM chamados_staging")
+        staging_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(DISTINCT \"{}\") FROM chamados".format(col_id_db))
+        original_unique_count = cursor.fetchone()[0]
+        
+        if staging_count >= original_unique_count * 0.9:  # Proteção: não perder mais de 10%
+            cursor.execute("DROP TABLE chamados")
+            cursor.execute("ALTER TABLE chamados_staging RENAME TO chamados")
+            print(f"Limpeza concluída: Banco de dados de-duplicado para {len(db_dict)} registros únicos.")
+        else:
+            cursor.execute("DROP TABLE chamados_staging")
+            print(f"ALERTA: De-duplicação abortada por segurança. Staging tinha {staging_count} vs {original_unique_count} registros únicos.")
+            conn.close()
+            return
         
         # Definir query para novos registros do CSV (14 colunas)
         placeholders = ", ".join(["?"] * len(colunas_db))
@@ -273,8 +290,9 @@ def sync_db():
                 
                 has_history = pedido_id in pedidos_com_historico
                 
-                # O registro já foi alterado pelo usuário se possuir histórico, responsável preenchido ou status Finalizado
-                if has_history or not is_resp_empty or is_status_finalizado:
+                # O registro já foi alterado pelo usuário se possuir histórico, responsável preenchido,
+                # tratativa preenchida, procedência preenchida, ou status Finalizado
+                if has_history or not is_resp_empty or not is_trat_empty or not is_proc_empty or is_status_finalizado:
                     pula_tratados += 1
                 else:
                     # Retirar o ID da lista de valores e colocar no final para a cláusula WHERE
