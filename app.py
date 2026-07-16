@@ -457,7 +457,8 @@ def api_listar_usuarios():
             usuarios.append({
                 "Email": row.get("Email"),
                 "Nome": row.get("Nome"),
-                "Perfil": row.get("Perfil")
+                "Perfil": row.get("Perfil"),
+                "Senha": row.get("Senha")
             })
     return jsonify(usuarios)
 
@@ -859,7 +860,23 @@ def dict_from_row(row):
         if "ID do Pedido" in new_key: new_key = "ID_do_Pedido"
         if "Regional 2" in new_key: new_key = "Regional_2"
         if "Criado por" in new_key: new_key = "Criado por"
-        new_d[new_key] = v
+        
+        val = v
+        if isinstance(v, str):
+            val_clean = v.strip()
+            if "proced" in new_key.lower():
+                val_lower = val_clean.lower()
+                if val_lower in ["procedente", "procédente", "procedente"]:
+                    val = "Procedente"
+                elif val_lower in ["não procedente", "nao procedente", "improcedente", "improcedente"]:
+                    val = "Não Procedente"
+                elif val_lower == "em analise" or val_lower == "em análise":
+                    val = "Em Análise"
+                else:
+                    val = val_clean
+            else:
+                val = val_clean
+        new_d[new_key] = val
     return new_d
 
 @app.get("/api/fluxo/buscar/<pedido>")
@@ -940,9 +957,17 @@ def fluxo_atualizar():
         nova_diverg = dados.get("divergencia", "")
         novo_valor = dados.get("valor", "")
         
+        was_finalizado = valores_antigos.get(col_status) and str(valores_antigos.get(col_status)).strip().lower() == 'finalizado'
+        
         proc_clean = nova_proc.strip().lower() if nova_proc else ""
-        if proc_clean and proc_clean != "em analise" and nova_trat.strip():
+        if proc_clean and proc_clean not in ["em analise", "em análise"] and nova_trat.strip():
             novo_status = "Finalizado"
+        elif was_finalizado:
+            # Se já estava Finalizado, mantém Finalizado a menos que ambos os campos de procedência e tratativa sejam limpos
+            if not proc_clean and not nova_trat.strip():
+                novo_status = "Em Andamento"
+            else:
+                novo_status = "Finalizado"
         else:
             novo_status = "Em Andamento"
             
@@ -1470,6 +1495,84 @@ def gestao():
 @login_required
 def dashboard():
     return render_template("dashboard.html", usuario=session.get('nome'), perfil=session.get('perfil'))
+
+@app.get("/apresentacao")
+@login_required
+def apresentacao():
+    if session.get("perfil") != "Admin":
+        return render_template("login.html", erro="Acesso não autorizado. Apenas administradores podem visualizar a apresentação."), 403
+    
+    # Listar e ordenar os slides numericamente
+    diretorio = Path(__file__).parent / "PPT" / "Apresentação de fechamento de perdas- PET LOVE- março 2026"
+    arquivos = []
+    if diretorio.exists():
+        import re
+        def extrair_numero(nome):
+            match = re.search(r"Slide(\d+)", nome, re.IGNORECASE)
+            return int(match.group(1)) if match else 0
+            
+        arquivos = [f.name for f in diretorio.glob("Slide*.PNG")]
+        arquivos.sort(key=extrair_numero)
+        
+    return render_template(
+        "apresentacao.html",
+        usuario=session.get('nome'),
+        perfil=session.get('perfil'),
+        slides=arquivos
+    )
+
+@app.get("/apresentacao/slides/<path:filename>")
+@login_required
+def obter_slide(filename):
+    if session.get("perfil") != "Admin":
+        return "Acesso negado", 403
+    diretorio = Path(__file__).parent / "PPT" / "Apresentação de fechamento de perdas- PET LOVE- março 2026"
+    return send_from_directory(diretorio, filename)
+
+@app.get("/apresentacao/pdf")
+@login_required
+def gerar_apresentacao_pdf():
+    if session.get("perfil") != "Admin":
+        return "Acesso negado", 403
+        
+    diretorio = Path(__file__).parent / "PPT" / "Apresentação de fechamento de perdas- PET LOVE- março 2026"
+    if not diretorio.exists():
+        return "Diretório de slides não encontrado.", 404
+        
+    import re
+    from PIL import Image
+    
+    arquivos = list(diretorio.glob("Slide*.PNG"))
+    if not arquivos:
+        arquivos = list(diretorio.glob("Slide*.png"))
+        
+    if not arquivos:
+        return "Nenhum slide encontrado.", 404
+        
+    def extrair_numero(caminho):
+        match = re.search(r"Slide(\d+)", caminho.name, re.IGNORECASE)
+        return int(match.group(1)) if match else 0
+        
+    arquivos.sort(key=extrair_numero)
+    
+    imagens = []
+    for arq in arquivos:
+        try:
+            img = Image.open(arq)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            imagens.append(img)
+        except Exception as e:
+            print(f"Erro ao abrir imagem {arq}: {e}")
+            
+    if not imagens:
+        return "Erro ao processar as imagens.", 500
+        
+    pdf_destino = EXPORT_DIR / "apresentacao_fechamento_perdas_marco_2026.pdf"
+    
+    imagens[0].save(pdf_destino, save_all=True, append_images=imagens[1:])
+    
+    return send_from_directory(EXPORT_DIR, pdf_destino.name, as_attachment=True)
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False)

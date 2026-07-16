@@ -55,6 +55,10 @@
       <a href="/dashboard" class="active">Dashboard</a>
       {% if session.usuario == 'admin@jm.com' %}
       <a href="/usuarios">Usuários</a>
+      <a href="/inconsistencias">Inconsistências</a>
+      {% endif %}
+      {% if session.perfil == 'Admin' %}
+      <a href="/apresentacao">Apresentação</a>
       {% endif %}
     </div>
     <div style="display:flex; gap:15px; align-items:center;">
@@ -134,6 +138,27 @@ window.addEventListener('DOMContentLoaded', async () => {
     };
     const formatMoeda = (val) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+    const normalizarNome = (nome) => {
+      if (!nome) return 'Não Informado';
+      const n = String(nome).trim().toLowerCase();
+      if (n.includes('raquel') || n.includes('oliveira')) {
+        return 'Raquel Oliveira Santos do Nascimento';
+      }
+      if (n.includes('elen') || n.includes('elencarmo')) {
+        return 'Elen Caroline Silva do Carmo';
+      }
+      if (n.includes('thamiris') || n.includes('thamires')) {
+        return 'Thamiris Almeida Santos';
+      }
+      if (n.includes('daniela')) {
+        return 'Daniela Aparecida Vieira da Silva';
+      }
+      if (n.includes('desconto')) {
+        return 'Desconto';
+      }
+      return String(nome).trim();
+    };
+
     let total = dados.length;
     let pendentes = 0;
     let valorRisco = 0;
@@ -145,44 +170,59 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     dados.forEach(d => {
       const responsavel = (d['Responsavel'] || '').trim();
-      const proc = (d['Procedência'] || '').trim();
-      // A regra de negócio: Se não tem Responsável, está Pendente.
-      // Se tem Responsável, a Acareação foi finalizada (Procedente ou Não Procedente).
-      const statusStr = responsavel === '' ? 'Pendente' : (proc === '' ? 'Finalizado sem status' : proc);
+      const proc = (d['Procedência'] || d['Procedncia'] || '').trim();
+      const tratativa = (d['Tratativa'] || '').trim();
+      
+      const estaFinalizado = responsavel !== '' || tratativa !== '' || (proc !== '' && proc.toLowerCase() !== 'em analise' && proc.toLowerCase() !== 'em análise');
+      
+      let statusStr = 'Pendente';
+      if (estaFinalizado) {
+        if (proc === 'Procedente') {
+          statusStr = 'Procedente';
+        } else if (proc === 'Não Procedente' || proc === 'Nao Procedente' || proc === 'Improcedente') {
+          statusStr = 'Não Procedente';
+        } else {
+          statusStr = proc !== '' ? proc : 'Finalizado';
+        }
+      }
       
       const valor = parseValor(d['Valor']);
       const regional = (d['Regional_2'] || d['Regional'] || '').trim() || 'Desconhecida';
-      const usuario = (d['Criado por'] || '').trim() || 'Não Informado';
+      
+      const criadorRaw = (d['Criado por'] || '').trim();
+      const criador = normalizarNome(criadorRaw);
+      
+      const responsavelRaw = (d['Responsavel'] || '').trim();
+      const finalizador = normalizarNome(responsavelRaw);
 
       if(statusCount[statusStr] !== undefined) {
          statusCount[statusStr]++;
       } else if (statusStr !== 'Pendente') {
-         // Fallback se não for nem Procedente nem Não Procedente
          statusCount['Não Procedente'] = (statusCount['Não Procedente'] || 0) + 1;
       }
       
       if (!regionalCount[regional]) { regionalCount[regional] = { abertos: 0, finalizados: 0 }; }
-      
-      const isCargaTMS = usuario.toLowerCase() === 'carga tms';
-      if (!isCargaTMS) {
-        if (!usuarioCount[usuario]) { usuarioCount[usuario] = { abertos: 0, finalizados: 0 }; }
-      }
 
-      if(responsavel === '') {
+      if (statusStr === 'Pendente') {
         pendentes++;
         valorRisco += valor;
         regionalCount[regional].abertos++;
-        if (!isCargaTMS) {
-          usuarioCount[usuario].abertos++;
+        
+        if (criador !== 'Carga TMS') {
+          if (!usuarioCount[criador]) { usuarioCount[criador] = { abertos: 0, finalizados: 0 }; }
+          usuarioCount[criador].abertos++;
         }
       } else {
-        // Tem responsável = Finalizado
+        // Finalizado
         regionalCount[regional].finalizados++;
-        if (!isCargaTMS) {
-          usuarioCount[usuario].finalizados++;
-        }
-        if(statusStr === 'Procedente') {
+        if (statusStr === 'Procedente') {
           valorPerda += valor;
+        }
+        
+        const respName = finalizador !== 'Não Informado' ? finalizador : criador;
+        if (respName !== 'Carga TMS') {
+          if (!usuarioCount[respName]) { usuarioCount[respName] = { abertos: 0, finalizados: 0 }; }
+          usuarioCount[respName].finalizados++;
         }
       }
     });
@@ -332,8 +372,20 @@ window.addEventListener('DOMContentLoaded', async () => {
       const exportData = dados.map(d => {
         const responsavel = (d['Responsavel'] || '').trim();
         const proc = (d['Procedência'] || d['Procedncia'] || '').trim();
+        const tratativa = (d['Tratativa'] || '').trim();
+        
+        const estaFinalizado = responsavel !== '' || tratativa !== '' || (proc !== '' && proc.toLowerCase() !== 'em analise' && proc.toLowerCase() !== 'em análise');
+        
         let status = 'Pendente';
-        if (responsavel !== '') status = proc !== '' ? proc : 'Finalizado';
+        if (estaFinalizado) {
+          if (proc === 'Procedente') {
+            status = 'Procedente';
+          } else if (proc === 'Não Procedente' || proc === 'Nao Procedente' || proc === 'Improcedente') {
+            status = 'Não Procedente';
+          } else {
+            status = proc !== '' ? proc : 'Finalizado';
+          }
+        }
 
         return {
           "ID Pedido": d['ID_do_Pedido'] || '',

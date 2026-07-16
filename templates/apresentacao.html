@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Apresentação de Fechamento de Perdas</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f0a18;
+      --card: #181126;
+      --line: #2d2045;
+      --text: #f3f0f7;
+      --muted: #a69bb8;
+      --accent: #9d4edd;
+      --accent-hover: #b5179e;
+      --secondary: #ef4154;
+      --success: #38a169;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 'Inter', system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+    main {
+      width: min(1400px, 96%);
+      margin: 30px auto;
+    }
+    
+    /* Nav */
+    .nav { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; justify-content: space-between; align-items: center;}
+    .nav-links { display:flex; gap:15px; }
+    .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--muted); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
+    .nav a:hover { background: var(--line); color: var(--text); }
+    .nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    
+    /* Header */
+    .corporate-header { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--line); padding: 25px 35px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(157, 78, 221, 0.08); flex-wrap: wrap; gap: 20px;}
+    .corporate-header .logos { display: flex; align-items: center; }
+    .corporate-header .jm-logo { height: 60px; object-fit: contain; }
+    .corporate-header .title-area { text-align: right; }
+    .title-area h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
+    .title-area p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 500;}
+
+    /* Premium Presentation Card */
+    .presentation-container {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+      position: relative;
+    }
+
+    /* Screen Area */
+    .viewer-screen {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 12px;
+      border: 2px solid var(--line);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+    }
+    
+    .viewer-screen img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      transition: opacity 0.4s ease-in-out;
+      opacity: 0;
+    }
+    
+    .viewer-screen img.loaded {
+      opacity: 1;
+    }
+
+    /* Overlay Controls */
+    .screen-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(24, 17, 38, 0.7);
+      border: 1px solid rgba(157, 78, 221, 0.4);
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      z-index: 10;
+      backdrop-filter: blur(5px);
+    }
+    .screen-arrow:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: 0 0 15px var(--accent);
+    }
+    .arrow-left { left: 20px; }
+    .arrow-right { right: 20px; }
+
+    /* Control Panel */
+    .controls-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 15px 20px;
+      background: rgba(45, 32, 69, 0.3);
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+    
+    .controls-left, .controls-center, .controls-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Buttons */
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--line);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .btn:hover:not(:disabled) {
+      background: rgba(157, 78, 221, 0.2);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      box-shadow: 0 0 15px rgba(181, 23, 158, 0.4);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Select styles */
+    select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 8px 12px;
+      border-radius: 8px;
+      outline: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    select:focus {
+      border-color: var(--accent);
+    }
+
+    .slide-info {
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+
+    /* Thumbnail Carousel */
+    .thumbnails-outer {
+      width: 100%;
+      overflow-x: auto;
+      padding: 10px 0;
+      border-radius: 12px;
+      background: rgba(15, 10, 24, 0.5);
+      border: 1px solid var(--line);
+    }
+    .thumbnails-inner {
+      display: flex;
+      gap: 12px;
+      padding: 0 15px;
+      width: max-content;
+    }
+    .thumb-card {
+      width: 140px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 6px;
+      border: 2px solid var(--line);
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .thumb-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+    .thumb-card:hover img {
+      opacity: 0.9;
+    }
+    .thumb-card.active {
+      border-color: var(--accent);
+      transform: scale(1.05);
+      box-shadow: 0 0 10px var(--accent);
+    }
+    .thumb-card.active img {
+      opacity: 1;
+    }
+    .thumb-card .thumb-num {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      background: rgba(0,0,0,0.7);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    /* Keyboard Shortcuts Info */
+    .shortcuts-info {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .shortcut-badge {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    /* Print styling rules */
+    #print-container { display: none; }
+    
+    @media print {
+      body {
+        background: #0f0a18 !important;
+        color: #f3f0f7 !important;
+      }
+      main { display: none !important; }
+      #print-container {
+        display: block !important;
+        background: #0f0a18 !important;
+        width: 100vw !important;
+      }
+      .print-slide {
+        width: 100vw !important;
+        height: 100vh !important;
+        page-break-after: always !important;
+        page-break-inside: avoid !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        background: #0f0a18 !important;
+        box-sizing: border-box;
+        padding: 50px;
+        color: #f3f0f7 !important;
+        position: relative;
+      }
+      .print-slide img {
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+      }
+    }
+
+    /* Dynamic HTML Slides CSS */
+    .dyn-slide h2 { color: var(--accent); }
+  </style>
+  <!-- Chart.js Script for Rendering Dynamic Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <main>
+    <!-- Navegação -->
+    <div class="nav">
+      <div class="nav-links">
+        <a href="/">Consulta TMSLOG</a>
+        <a href="/nova-acareacao">Nova Acareação</a>
+        <a href="/gestao">Gestão de Solicitações</a>
+        <a href="/dashboard">Dashboard</a>
+        {% if session.usuario == 'admin@jm.com' %}
+        <a href="/usuarios">Usuários</a>
+        <a href="/inconsistencias">Inconsistências</a>
+        {% endif %}
+        <a href="/apresentacao" class="active">Apresentação</a>
+      </div>
+      <div style="display:flex; gap:15px; align-items:center;">
+        <span style="font-size:13px; font-weight:bold; color:var(--muted)">Olá, {{ usuario }} ({{ perfil }})</span>
+        <a href="/logout" style="background:var(--secondary); color:#fff; border-color:var(--secondary)">Sair</a>
+      </div>
+    </div>
+
+    <!-- Cabeçalho -->
+    <header class="corporate-header">
+      <div class="logos">
+        <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'display:flex;align-items:center;font-weight:900;font-size:42px;color:var(--accent);letter-spacing:-2px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:24px;margin-left:4px;margin-top:-14px;\'>TD</span></div>'">
+      </div>
+      <div class="title-area">
+        <h1>Fechamento de Perdas</h1>
+        <p>Apresentação de Resultados Dinâmica - PET LOVE</p>
+      </div>
+    </header>
+
+    <!-- Filtro de Período / Mês (Alimenta a Apresentação dinamicamente) -->
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 20px; justify-content: flex-start; background: var(--card); border: 1px solid var(--line); padding: 15px 25px; border-radius: 12px; box-shadow: 0 8px 30px rgba(157, 78, 221, 0.04);">
+      <label for="filtro-mes" style="font-weight: 700; color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 6px;">
+        📅 Filtrar Mês Apresentado:
+      </label>
+      <select id="filtro-mes" onchange="selecionarMes(this.value)" style="padding: 10px 15px; min-width: 200px;">
+        <option value="todos">Todos os Meses</option>
+      </select>
+      <span style="font-size:12px; color:var(--muted); font-style:italic; margin-left:15px;">
+        💡 Nota: As telas com dados e gráficos serão atualizadas automaticamente para o período escolhido.
+      </span>
+    </div>
+
+    <!-- Visualizador de Slides -->
+    <section class="presentation-container">
+      
+      <!-- Tela de Exibição -->
+      <div class="viewer-screen" id="screen-container">
+        <button class="screen-arrow arrow-left" onclick="slideAnterior()" aria-label="Slide Anterior">&#10094;</button>
+        
+        <!-- Slide Estático (Imagens) -->
+        <img id="slide-img" src="" alt="Slide de Apresentação" class="loaded">
+        
+        <!-- Slides Dinâmicos em HTML -->
+        <div id="dynamic-slide-container" style="width: 100%; height: 100%; display: none; padding: 40px; box-sizing: border-box; flex-direction: column; justify-content: center; position: relative; background: #0f0a18;">
+          
+          <!-- Slide 2: Período Analisado -->
+          <div id="dyn-slide-2" class="dyn-slide" style="display:none; text-align: center; height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+             <h2 style="font-size: 42px; font-weight:800; color:var(--accent); margin:0;">Período Analisado:</h2>
+             <h1 id="dyn-slide-2-mes" style="font-size: 60px; font-weight:900; margin: 20px 0; color:#fff;">-</h1>
+             <p style="font-size: 18px; color:var(--muted); max-width:800px; margin-top:20px; text-align:center; line-height: 1.6;">O objetivo da apresentação é dar visibilidade da saúde operacional do cliente Pet Love, demonstrar o impacto financeiro, principais causas identificadas de perdas e discutir pontos oportunidades de melhoria.</p>
+          </div>
+          
+          <!-- Slide 5: Resumo Geral de Perdas -->
+          <div id="dyn-slide-5" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid var(--line); padding-bottom:10px;">
+                <h2 style="margin:0; font-size:24px; color:var(--accent); font-weight:800;">Pedidos Reclamados</h2>
+                <span id="dyn-slide-5-periodo" style="font-size:14px; color:var(--muted); font-weight:bold;">Período de análise: -</span>
+             </div>
+             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; flex:1; margin-top:25px;">
+                <div style="background:rgba(45,32,69,0.3); border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+                   <div style="font-size:48px; font-weight:900; color:var(--accent);" id="dyn-kpi-claims">0</div>
+                   <div style="font-size:13px; font-weight:bold; color:var(--muted); text-transform:uppercase; margin-top:8px;">Pedidos Reclamados</div>
+                </div>
+                <div style="background:rgba(45,32,69,0.3); border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+                   <div style="font-size:48px; font-weight:900; color:var(--secondary);" id="dyn-kpi-risco">R$ 0,00</div>
+                   <div style="font-size:13px; font-weight:bold; color:var(--muted); text-transform:uppercase; margin-top:8px;">Risco Financeiro Gerado</div>
+                </div>
+                <div style="background:rgba(45,32,69,0.3); border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+                   <div style="font-size:48px; font-weight:900; color:var(--secondary);" id="dyn-kpi-perda">R$ 0,00</div>
+                   <div style="font-size:13px; font-weight:bold; color:var(--muted); text-transform:uppercase; margin-top:8px;">Perda Confirmada</div>
+                </div>
+                <div style="background:rgba(45,32,69,0.3); border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+                   <div style="font-size:48px; font-weight:900; color:var(--success);" id="dyn-kpi-mitigado">0%</div>
+                   <div style="font-size:13px; font-weight:bold; color:var(--muted); text-transform:uppercase; margin-top:8px;">Risco Mitigado</div>
+                </div>
+             </div>
+          </div>
+          
+          <!-- Slide 6: Pedidos por Filial -->
+          <div id="dyn-slide-6" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column;">
+             <h2 style="margin:0 0 15px 0; font-size:24px; color:var(--accent); font-weight:800; border-bottom: 2px solid var(--line); padding-bottom:10px;">Pedidos Reclamados por Filial/Operação</h2>
+             <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                <canvas id="chart-filial" style="max-height:100%; max-width:100%;"></canvas>
+             </div>
+          </div>
+
+          <!-- Slide 7: Distribuição % por Filial -->
+          <div id="dyn-slide-7" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column;">
+             <h2 style="margin:0 0 15px 0; font-size:24px; color:var(--accent); font-weight:800; border-bottom: 2px solid var(--line); padding-bottom:10px;">Distribuição de Pedidos Reclamados (%)</h2>
+             <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                <canvas id="chart-filial-percent" style="max-height:100%; max-width:100%;"></canvas>
+             </div>
+          </div>
+
+          <!-- Slide 8: Culpabilidade JM (Procedentes) -->
+          <div id="dyn-slide-8" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column;">
+             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid var(--line); padding-bottom:10px;">
+                <h2 style="margin:0; font-size:24px; color:var(--accent); font-weight:800;">Sobre os Casos Reclamados e Procedentes</h2>
+                <span style="font-size:13px; color:var(--muted); font-weight:bold;">Reclamados de Culpabilidade JM</span>
+             </div>
+             <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center; margin-top:15px;">
+                <canvas id="chart-culp-jm" style="max-height:100%; max-width:100%;"></canvas>
+             </div>
+          </div>
+
+          <!-- Slide 9: Culpabilidade Pet Love (Improcedentes) -->
+          <div id="dyn-slide-9" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column;">
+             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid var(--line); padding-bottom:10px;">
+                <h2 style="margin:0; font-size:24px; color:var(--accent); font-weight:800;">Sobre os Casos Reclamados e Improcedentes</h2>
+                <span style="font-size:13px; color:var(--muted); font-weight:bold;">Reclamados de Culpabilidade PET LOVE (Improcedentes)</span>
+             </div>
+             <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center; margin-top:15px;">
+                <canvas id="chart-culp-pet" style="max-height:100%; max-width:100%;"></canvas>
+             </div>
+          </div>
+
+          <!-- Slide 11: Evolução Histórica -->
+          <div id="dyn-slide-11" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column;">
+             <h2 style="margin:0 0 15px 0; font-size:24px; color:var(--accent); font-weight:800; border-bottom: 2px solid var(--line); padding-bottom:10px;">Evolução de Pedidos Reclamados (Histórico)</h2>
+             <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                <canvas id="chart-evolucao" style="max-height:100%; max-width:100%;"></canvas>
+             </div>
+          </div>
+
+          <!-- Slide 12: Comparativo Mensal -->
+          <div id="dyn-slide-12" class="dyn-slide" style="display:none; height:100%; display:flex; flex-direction:column;">
+             <h2 style="margin:0 0 15px 0; font-size:24px; color:var(--accent); font-weight:800; border-bottom: 2px solid var(--line); padding-bottom:10px;">Comparativo Mensal de Pedidos Reclamados</h2>
+             <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                <canvas id="chart-comparativo" style="max-height:100%; max-width:100%;"></canvas>
+             </div>
+          </div>
+          
+        </div>
+        
+        <button class="screen-arrow arrow-right" onclick="proximoSlide()" aria-label="Próximo Slide">&#10095;</button>
+      </div>
+      
+      <!-- Painel de Controles -->
+      <div class="controls-panel">
+        
+        <!-- Controles de Navegação e Info -->
+        <div class="controls-left">
+          <button class="btn" onclick="slideAnterior()" id="btn-prev" title="Slide Anterior">⏮️ Ant.</button>
+          <span class="slide-info" id="slide-counter">Slide -- / --</span>
+          <button class="btn" onclick="proximoSlide()" id="btn-next" title="Próximo Slide">Prox. ⏭️</button>
+        </div>
+        
+        <!-- Player de Slideshow -->
+        <div class="controls-center">
+          <button class="btn" onclick="toggleSlideshow()" id="btn-play" title="Iniciar/Pausar Slideshow">▶️ Iniciar</button>
+          <select id="slideshow-interval" onchange="alterarIntervalo()" title="Velocidade da transição">
+            <option value="3000">3 segundos</option>
+            <option value="5000" selected>5 segundos</option>
+            <option value="10000">10 segundos</option>
+          </select>
+        </div>
+        
+        <!-- PDF e Tela Cheia -->
+        <div class="controls-right">
+          <button class="btn" onclick="toggleFullscreen()" id="btn-fullscreen" title="Tela Cheia">📺 Tela Cheia</button>
+          <button class="btn btn-primary" onclick="baixarPDF(this)" id="btn-pdf" title="Imprimir/Gerar PDF de toda a apresentação filtrada">
+            <span>📥 Imprimir PDF</span>
+          </button>
+        </div>
+        
+      </div>
+      
+      <!-- Miniaturas (Thumbnails) -->
+      <div class="thumbnails-outer">
+        <div class="thumbnails-inner" id="thumbs-container"></div>
+      </div>
+
+      <!-- Atalhos de Teclado -->
+      <div class="shortcuts-info">
+        <span><span class="shortcut-badge">&larr;</span> Anterior</span>
+        <span><span class="shortcut-badge">&rarr;</span> Próximo</span>
+        <span><span class="shortcut-badge">Espaço</span> Iniciar/Pausar</span>
+        <span><span class="shortcut-badge">F</span> Tela Cheia</span>
+        <span><span class="shortcut-badge">Esc</span> Sair da Tela Cheia</span>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Container de Impressão de todos os slides (alimentado via JS antes de chamar window.print()) -->
+  <div id="print-container"></div>
+
+  <script>
+    // Carregar a lista de slides injetada pelo backend
+    const slides = {{ slides | tojson }};
+    let currentIndex = 0;
+    let slideshowTimer = null;
+    let isPlaying = false;
+    
+    // Instâncias do Chart.js na tela
+    let chartFilial = null;
+    let chartFilialPercent = null;
+    let chartCulpJm = null;
+    let chartCulpPet = null;
+    let chartEvolucao = null;
+    let chartComparativo = null;
+    
+    // Instâncias do Chart.js de impressão
+    let printCharts = [];
+
+    // Dados gerais e filtrados
+    let todosDados = [];
+    let dadosFiltrados = [];
+
+    const slideImg = document.getElementById('slide-img');
+    const slideCounter = document.getElementById('slide-counter');
+    const btnPlay = document.getElementById('btn-play');
+    const thumbsContainer = document.getElementById('thumbs-container');
+    const screenContainer = document.getElementById('screen-container');
+
+    // Inicializar visualização
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (slides.length > 0) {
+        criarThumbnails();
+        await carregarDados();
+        exibirSlide(0);
+      } else {
+        slideCounter.textContent = "Nenhum slide disponível";
+        slideImg.style.display = 'none';
+      }
+    });
+
+    // Buscar todos os registros do backend e popular filtro
+    async function carregarDados() {
+      try {
+        const response = await fetch('/api/fluxo/todos');
+        todosDados = await response.json();
+        if (!response.ok) throw new Error(todosDados.erro || 'Falha ao carregar os dados.');
+        
+        popularFiltroMeses(todosDados);
+        filtrarDados();
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+      }
+    }
+
+    // Filtrar dados do banco com base no mês selecionado
+    function filtrarDados() {
+      const mesSelecionado = document.getElementById('filtro-mes').value;
+      if (mesSelecionado === 'todos') {
+        dadosFiltrados = todosDados;
+      } else {
+        dadosFiltrados = todosDados.filter(d => {
+          const dataStr = d['Data do Carregamento'] || d['Data_do_Carregamento'];
+          if (dataStr) {
+            const partes = dataStr.split('/');
+            if (partes.length === 3) {
+              return `${partes[1]}/${partes[2]}` === mesSelecionado;
+            }
+          }
+          return false;
+        });
+      }
+      
+      // Atualizar o slide ativo
+      exibirSlide(currentIndex);
+    }
+
+    function selecionarMes(mes) {
+      pausarSlideshow();
+      filtrarDados();
+    }
+
+    // Extrair meses únicos e alimentar dropdown do filtro
+    function popularFiltroMeses(dados) {
+      const select = document.getElementById('filtro-mes');
+      select.innerHTML = '';
+      
+      const mesesSet = new Set();
+      dados.forEach(d => {
+        const dataStr = d['Data do Carregamento'] || d['Data_do_Carregamento'];
+        if (dataStr) {
+          const partes = dataStr.split('/');
+          if (partes.length === 3) {
+            mesesSet.add(`${partes[1]}/${partes[2]}`);
+          }
+        }
+      });
+      
+      const mesesOrdenados = Array.from(mesesSet).sort((a, b) => {
+        const [mA, yA] = a.split('/').map(Number);
+        const [mB, yB] = b.split('/').map(Number);
+        return yA - yB || mA - mB;
+      });
+      
+      const nomesMeses = {
+        '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+        '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+        '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+      };
+      
+      // Adicionar opção de "Todos"
+      const optTodos = document.createElement('option');
+      optTodos.value = 'todos';
+      optTodos.textContent = 'Todos os Meses';
+      select.appendChild(optTodos);
+      
+      mesesOrdenados.forEach(m_y => {
+        const [m, y] = m_y.split('/');
+        const label = `${nomesMeses[m]} / ${y}`;
+        const opt = document.createElement('option');
+        opt.value = m_y;
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+      
+      // Selecionar o mês mais recente por padrão
+      if (mesesOrdenados.length > 0) {
+        select.value = mesesOrdenados[mesesOrdenados.length - 1];
+      } else {
+        select.value = 'todos';
+      }
+    }
+
+    // Criar as miniaturas na barra inferior
+    function criarThumbnails() {
+      thumbsContainer.innerHTML = '';
+      slides.forEach((slide, idx) => {
+        const thumb = document.createElement('div');
+        thumb.className = `thumb-card ${idx === 0 ? 'active' : ''}`;
+        thumb.id = `thumb-${idx}`;
+        thumb.onclick = () => {
+          pausarSlideshow();
+          exibirSlide(idx);
+        };
+        
+        thumb.innerHTML = `
+          <img src="/apresentacao/slides/${slide}" alt="Miniatura ${idx + 1}" loading="lazy">
+          <span class="thumb-num">${idx + 1}</span>
+        `;
+        thumbsContainer.appendChild(thumb);
+      });
+    }
+
+    // Exibir o slide especificado (trata imagens estáticas e dinâmicas HTML)
+    function exibirSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      
+      currentIndex = index;
+      const dynamicSlideContainer = document.getElementById('dynamic-slide-container');
+      
+      // Ocultar todos os containers de slides dinâmicos
+      document.querySelectorAll('.dyn-slide').forEach(el => el.style.display = 'none');
+      
+      // Definimos os índices dos slides dinâmicos correspondentes:
+      // Slide 2: período (1), Slide 5: kpis (4), Slide 6: filial (5), Slide 7: filial% (6), Slide 8: culp jm (7), Slide 9: culp pet (8), Slide 11: evolucao (10), Slide 12: comparativo (11)
+      const dynamicIndices = [1, 4, 5, 6, 7, 8, 10, 11];
+      
+      if (dynamicIndices.includes(index)) {
+        slideImg.style.display = 'none';
+        dynamicSlideContainer.style.display = 'flex';
+        
+        let dynId = '';
+        if (index === 1) {
+          dynId = 'dyn-slide-2';
+          const select = document.getElementById('filtro-mes');
+          const selectedText = select.options[select.selectedIndex]?.textContent || 'Março/2026';
+          document.getElementById('dyn-slide-2-mes').textContent = selectedText;
+        } else if (index === 4) {
+          dynId = 'dyn-slide-5';
+          atualizarSlide5();
+        } else if (index === 5) {
+          dynId = 'dyn-slide-6';
+          setTimeout(atualizarSlide6, 20);
+        } else if (index === 6) {
+          dynId = 'dyn-slide-7';
+          setTimeout(atualizarSlide7, 20);
+        } else if (index === 7) {
+          dynId = 'dyn-slide-8';
+          setTimeout(atualizarSlide8, 20);
+        } else if (index === 8) {
+          dynId = 'dyn-slide-9';
+          setTimeout(atualizarSlide9, 20);
+        } else if (index === 10) {
+          dynId = 'dyn-slide-11';
+          setTimeout(atualizarSlide11, 20);
+        } else if (index === 11) {
+          dynId = 'dyn-slide-12';
+          setTimeout(atualizarSlide12, 20);
+        }
+        
+        if (dynId) {
+          document.getElementById(dynId).style.display = 'flex';
+        }
+      } else {
+        dynamicSlideContainer.style.display = 'none';
+        slideImg.style.display = 'block';
+        
+        slideImg.classList.remove('loaded');
+        slideImg.src = `/apresentacao/slides/${slides[index]}`;
+        slideImg.onload = () => {
+          slideImg.classList.add('loaded');
+        };
+      }
+      
+      // Atualizar contador de slides
+      slideCounter.textContent = `Slide ${currentIndex + 1} de ${slides.length}`;
+      
+      // Atualizar miniatura ativa
+      document.querySelectorAll('.thumb-card').forEach((card, idx) => {
+        if (idx === currentIndex) {
+          card.classList.add('active');
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } else {
+          card.classList.remove('active');
+        }
+      });
+      
+      // Ajustar botões de navegação
+      document.getElementById('btn-prev').disabled = currentIndex === 0;
+      document.getElementById('btn-next').disabled = currentIndex === slides.length - 1;
+    }
+
+    // Navegação
+    function proximoSlide() {
+      if (currentIndex < slides.length - 1) {
+        exibirSlide(currentIndex + 1);
+      } else {
+        pausarSlideshow();
+      }
+    }
+
+    function slideAnterior() {
+      if (currentIndex > 0) {
+        exibirSlide(currentIndex - 1);
+      }
+    }
+
+    // Toggle Slideshow
+    function toggleSlideshow() {
+      if (isPlaying) {
+        pausarSlideshow();
+      } else {
+        iniciarSlideshow();
+      }
+    }
+
+    function iniciarSlideshow() {
+      if (isPlaying) return;
+      isPlaying = true;
+      btnPlay.innerHTML = '⏸️ Pausar';
+      btnPlay.classList.add('btn-primary');
+      
+      const intervalo = parseInt(document.getElementById('slideshow-interval').value);
+      if (currentIndex === slides.length - 1) {
+        exibirSlide(0);
+      }
+      
+      slideshowTimer = setInterval(() => {
+        if (currentIndex < slides.length - 1) {
+          proximoSlide();
+        } else {
+          pausarSlideshow();
+        }
+      }, intervalo);
+    }
+
+    function pausarSlideshow() {
+      if (!isPlaying) return;
+      isPlaying = false;
+      btnPlay.innerHTML = '▶️ Iniciar';
+      btnPlay.classList.remove('btn-primary');
+      if (slideshowTimer) {
+        clearInterval(slideshowTimer);
+        slideshowTimer = null;
+      }
+    }
+
+    function alterarIntervalo() {
+      if (isPlaying) {
+        pausarSlideshow();
+        iniciarSlideshow();
+      }
+    }
+
+    // Fullscreen
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        screenContainer.requestFullscreen().catch(err => {
+          alert(`Erro ao ativar tela cheia: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      const btn = document.getElementById('btn-fullscreen');
+      btn.innerHTML = document.fullscreenElement ? '📴 Sair' : '📺 Tela Cheia';
+    });
+
+    // Teclado
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        pausarSlideshow();
+        proximoSlide();
+      } else if (e.key === 'ArrowLeft') {
+        pausarSlideshow();
+        slideAnterior();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        toggleSlideshow();
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      }
+    });
+
+    // Helpers
+    function parseValor(str) {
+      if (!str) return 0.0;
+      let clean = str.replace('R$', '').trim().replace(/\./g, '').replace(',', '.');
+      let val = parseFloat(clean);
+      return isNaN(val) ? 0.0 : val;
+    }
+
+    function formatarMoeda(val) {
+      return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    // LÓGICA DE DADOS DINÂMICOS DOS SLIDES
+
+    function atualizarSlide5() {
+      const select = document.getElementById('filtro-mes');
+      const selectedText = select.options[select.selectedIndex]?.textContent || 'Todos os Meses';
+      document.getElementById('dyn-slide-5-periodo').textContent = `Período de análise: ${selectedText}`;
+      
+      let totalRisco = 0;
+      let totalPerda = 0;
+      
+      dadosFiltrados.forEach(row => {
+        const val = parseValor(row['Valor']);
+        totalRisco += val;
+        
+        const proc = (row['Procedência'] || '').trim().toLowerCase();
+        const resp = (row['Responsavel'] || '').trim();
+        const isProcedente = proc === 'procedente' || proc === 'procédente' || (resp !== '' && proc !== 'não procedente' && proc !== 'nao procedente' && proc !== 'improcedente' && proc !== 'em analise');
+        
+        if (isProcedente) {
+          totalPerda += val;
+        }
+      });
+      
+      const mitigado = totalRisco > 0 ? ((totalRisco - totalPerda) / totalRisco) * 100 : 100;
+      
+      document.getElementById('dyn-kpi-claims').textContent = dadosFiltrados.length;
+      document.getElementById('dyn-kpi-risco').textContent = formatarMoeda(totalRisco);
+      document.getElementById('dyn-kpi-perda').textContent = formatarMoeda(totalPerda);
+      document.getElementById('dyn-kpi-mitigado').textContent = `${mitigado.toFixed(0)}%`;
+    }
+
+    function atualizarSlide6() {
+      let sp = 0, bar = 0, ssz = 0;
+      dadosFiltrados.forEach(row => {
+        const reg = (row['Regional_2'] || row['Regional'] || '').trim().toUpperCase();
+        if (reg.includes('SP')) sp++;
+        else if (reg.includes('BAR')) bar++;
+        else if (reg.includes('SSZ') || reg.includes('SANTOS')) ssz++;
+      });
+      
+      if (chartFilial) chartFilial.destroy();
+      
+      const ctx = document.getElementById('chart-filial').getContext('2d');
+      chartFilial = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['PetLog01 São Paulo', 'PetLog05 Barueri', 'Petlog48_XPT_SSZ'],
+          datasets: [{
+            label: 'Pedidos Reclamados',
+            data: [sp, bar, ssz],
+            backgroundColor: '#9d4edd',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function atualizarSlide7() {
+      let sp = 0, bar = 0, ssz = 0;
+      dadosFiltrados.forEach(row => {
+        const reg = (row['Regional_2'] || row['Regional'] || '').trim().toUpperCase();
+        if (reg.includes('SP')) sp++;
+        else if (reg.includes('BAR')) bar++;
+        else if (reg.includes('SSZ') || reg.includes('SANTOS')) ssz++;
+      });
+      
+      const total = sp + bar + ssz;
+      const spPct = total > 0 ? (sp / total) * 100 : 0;
+      const barPct = total > 0 ? (bar / total) * 100 : 0;
+      const sszPct = total > 0 ? (ssz / total) * 100 : 0;
+      
+      if (chartFilialPercent) chartFilialPercent.destroy();
+      
+      const ctx = document.getElementById('chart-filial-percent').getContext('2d');
+      chartFilialPercent = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['PetLog01 São Paulo', 'PetLog05 Barueri', 'Petlog48_XPT_SSZ'],
+          datasets: [{
+            label: 'Percentual (%)',
+            data: [spPct.toFixed(2), barPct.toFixed(2), sszPct.toFixed(2)],
+            backgroundColor: '#b5179e',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false }, ticks: { callback: v => `${v}%` } } }
+        }
+      });
+    }
+
+    function atualizarSlide8() {
+      let naoDevolvido = 0;
+      let acareacaoNaoRealizada = 0;
+      
+      dadosFiltrados.forEach(row => {
+        const proc = (row['Procedência'] || '').trim().toLowerCase();
+        const resp = (row['Responsavel'] || '').trim();
+        const isProcedente = proc === 'procedente' || proc === 'procédente' || (resp !== '' && proc !== 'não procedente' && proc !== 'nao procedente' && proc !== 'improcedente' && proc !== 'em analise');
+        
+        if (isProcedente) {
+          const div = (row['Descrição da Divergência'] || row['Descrição_da_Divergência'] || '').trim().toLowerCase();
+          if (div.includes('acare')) {
+            acareacaoNaoRealizada++;
+          } else {
+            naoDevolvido++;
+          }
+        }
+      });
+      
+      if (chartCulpJm) chartCulpJm.destroy();
+      
+      const ctx = document.getElementById('chart-culp-jm').getContext('2d');
+      chartCulpJm = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Não devolvido/Após prazo', 'Acareação não realizada'],
+          datasets: [{
+            label: 'Casos',
+            data: [naoDevolvido, acareacaoNaoRealizada],
+            backgroundColor: '#ef4154',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function atualizarSlide9() {
+      const petCounts = {
+        'Sem Sinalização': 0, 'Pedido não embarcado': 0, 'Pedido devolvido': 0,
+        'Avaria': 0, 'Envio parcial': 0, 'Problema de etiqueta': 0,
+        'Cliente não reconhece compra': 0, 'Pedido entregue': 0, 'Outros': 0
+      };
+      
+      dadosFiltrados.forEach(row => {
+        const proc = (row['Procedência'] || '').trim().toLowerCase();
+        const resp = (row['Responsavel'] || '').trim();
+        const isProcedente = proc === 'procedente' || proc === 'procédente' || (resp !== '' && proc !== 'não procedente' && proc !== 'nao procedente' && proc !== 'improcedente' && proc !== 'em analise');
+        
+        if (!isProcedente && resp !== '') {
+          const div = (row['Descrição da Divergência'] || row['Descrição_da_Divergência'] || '').trim().toLowerCase();
+          if (div.includes('sinaliza')) petCounts['Sem Sinalização']++;
+          else if (div.includes('embarcado') || div.includes('embarc')) petCounts['Pedido não embarcado']++;
+          else if (div.includes('devolvido') || div.includes('devoluc')) petCounts['Pedido devolvido']++;
+          else if (div.includes('avaria') || div.includes('avariado')) petCounts['Avaria']++;
+          else if (div.includes('parcial') || div.includes('faltante')) petCounts['Envio parcial']++;
+          else if (div.includes('etiqueta')) petCounts['Problema de etiqueta']++;
+          else if (div.includes('reconhece') || div.includes('compra')) petCounts['Cliente não reconhece compra']++;
+          else if (div.includes('entregue')) petCounts['Pedido entregue']++;
+          else petCounts['Outros']++;
+        }
+      });
+      
+      if (chartCulpPet) chartCulpPet.destroy();
+      
+      const ctx = document.getElementById('chart-culp-pet').getContext('2d');
+      chartCulpPet = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(petCounts),
+          datasets: [{
+            label: 'Casos',
+            data: Object.values(petCounts),
+            backgroundColor: '#4CAF50',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function atualizarSlide11() {
+      const evolMonths = {};
+      todosDados.forEach(row => {
+        const dt = row['Data do Carregamento'] || row['Data_do_Carregamento'];
+        if (dt) {
+          const partes = dt.split('/');
+          if (partes.length === 3) {
+            const m_y = `${partes[1]}/${partes[2]}`;
+            evolMonths[m_y] = (evolMonths[m_y] || 0) + 1;
+          }
+        }
+      });
+      
+      const sortedMonths = Object.keys(evolMonths).sort((a, b) => {
+        const [mA, yA] = a.split('/').map(Number);
+        const [mB, yB] = b.split('/').map(Number);
+        return yA - yB || mA - mB;
+      });
+      
+      const mesSelecionado = document.getElementById('filtro-mes').value;
+      let displayMonths = sortedMonths;
+      if (mesSelecionado !== 'todos') {
+        const idx = sortedMonths.indexOf(mesSelecionado);
+        if (idx !== -1) {
+          displayMonths = sortedMonths.slice(0, idx + 1);
+        }
+      }
+      
+      const evolValues = displayMonths.map(m => evolMonths[m]);
+      
+      if (chartEvolucao) chartEvolucao.destroy();
+      
+      const ctx = document.getElementById('chart-evolucao').getContext('2d');
+      chartEvolucao = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: displayMonths,
+          datasets: [{
+            label: 'Pedidos Reclamados',
+            data: evolValues,
+            borderColor: '#9d4edd',
+            backgroundColor: 'rgba(157, 78, 221, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function atualizarSlide12() {
+      const select = document.getElementById('filtro-mes');
+      const mesSelecionado = select.value;
+      
+      if (mesSelecionado === 'todos' || select.selectedIndex <= 1) {
+        if (chartComparativo) chartComparativo.destroy();
+        return;
+      }
+      
+      const optAtual = select.options[select.selectedIndex];
+      const optAnterior = select.options[select.selectedIndex - 1];
+      
+      let countAtual = 0;
+      let countAnterior = 0;
+      
+      todosDados.forEach(row => {
+        const dt = row['Data do Carregamento'] || row['Data_do_Carregamento'];
+        if (dt) {
+          const partes = dt.split('/');
+          if (partes.length === 3) {
+            const m_y = `${partes[1]}/${partes[2]}`;
+            if (m_y === optAtual.value) countAtual++;
+            else if (m_y === optAnterior.value) countAnterior++;
+          }
+        }
+      });
+      
+      if (chartComparativo) chartComparativo.destroy();
+      
+      const ctx = document.getElementById('chart-comparativo').getContext('2d');
+      chartComparativo = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: [optAnterior.textContent, optAtual.textContent],
+          datasets: [{
+            label: 'Volume',
+            data: [countAnterior, countAtual],
+            backgroundColor: ['#2d2045', '#9d4edd'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+        }
+      });
+    }
+
+    // IMPRESSÃO E GERAÇÃO DE PDF DINÂMICA
+    
+    function prepararImpressao() {
+      const pContainer = document.getElementById('print-container');
+      pContainer.innerHTML = '';
+      
+      const select = document.getElementById('filtro-mes');
+      const selectedText = select.options[select.selectedIndex]?.textContent || 'Todos os Meses';
+      const mesVal = select.value;
+      
+      slides.forEach((slide, index) => {
+        const slideDiv = document.createElement('div');
+        slideDiv.className = 'print-slide';
+        
+        const dynamicIndices = [1, 4, 5, 6, 7, 8, 10, 11];
+        if (dynamicIndices.includes(index)) {
+          if (index === 1) {
+            slideDiv.innerHTML = `
+              <div style="text-align: center; display:flex; flex-direction:column; justify-content:center; align-items:center; width:100%; height:100%;">
+                 <h2 style="font-size: 42px; font-weight:800; color:#9d4edd; margin:0;">Período Analisado:</h2>
+                 <h1 style="font-size: 60px; font-weight:900; margin: 20px 0; color:#fff;">${selectedText}</h1>
+                 <p style="font-size: 18px; color:#a69bb8; max-width:800px; margin-top:20px; text-align:center; line-height:1.6;">O objetivo da apresentação é dar visibilidade da saúde operacional do cliente Pet Love, demonstrar o impacto financeiro, principais causas identificadas de perdas e discutir pontos oportunidades de melhoria.</p>
+              </div>
+            `;
+          } else if (index === 4) {
+            let totalRisco = 0, totalPerda = 0;
+            dadosFiltrados.forEach(row => {
+              const val = parseValor(row['Valor']);
+              totalRisco += val;
+              const proc = (row['Procedência'] || '').trim().toLowerCase();
+              const resp = (row['Responsavel'] || '').trim();
+              const isProcedente = proc === 'procedente' || proc === 'procédente' || (resp !== '' && proc !== 'não procedente' && proc !== 'nao procedente' && proc !== 'improcedente' && proc !== 'em analise');
+              if (isProcedente) totalPerda += val;
+            });
+            const mitigado = totalRisco > 0 ? ((totalRisco - totalPerda) / totalRisco) * 100 : 100;
+            
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; justify-content:space-between; width:100%; height:100%;">
+                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #2d2045; padding-bottom:10px;">
+                    <h2 style="margin:0; font-size:24px; color:#9d4edd; font-weight:800;">Pedidos Reclamados</h2>
+                    <span style="font-size:14px; color:#a69bb8; font-weight:bold;">Período de análise: ${selectedText}</span>
+                 </div>
+                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; flex:1; margin-top:25px;">
+                    <div style="background:rgba(45,32,69,0.3); border:1px solid #2d2045; border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                       <div style="font-size:48px; font-weight:900; color:#9d4edd;">${dadosFiltrados.length}</div>
+                       <div style="font-size:13px; font-weight:bold; color:#a69bb8; text-transform:uppercase; margin-top:8px;">Pedidos Reclamados</div>
+                    </div>
+                    <div style="background:rgba(45,32,69,0.3); border:1px solid #2d2045; border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                       <div style="font-size:48px; font-weight:900; color:#ef4154;">${formatarMoeda(totalRisco)}</div>
+                       <div style="font-size:13px; font-weight:bold; color:#a69bb8; text-transform:uppercase; margin-top:8px;">Risco Financeiro Gerado</div>
+                    </div>
+                    <div style="background:rgba(45,32,69,0.3); border:1px solid #2d2045; border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                       <div style="font-size:48px; font-weight:900; color:#ef4154;">${formatarMoeda(totalPerda)}</div>
+                       <div style="font-size:13px; font-weight:bold; color:#a69bb8; text-transform:uppercase; margin-top:8px;">Perda Confirmada</div>
+                    </div>
+                    <div style="background:rgba(45,32,69,0.3); border:1px solid #2d2045; border-radius:12px; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                       <div style="font-size:48px; font-weight:900; color:#38a169;">${mitigado.toFixed(0)}%</div>
+                       <div style="font-size:13px; font-weight:bold; color:#a69bb8; text-transform:uppercase; margin-top:8px;">Risco Mitigado</div>
+                    </div>
+                 </div>
+              </div>
+            `;
+          } else if (index === 5) {
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+                 <h2 style="margin:0 0 15px 0; font-size:24px; color:#9d4edd; font-weight:800; border-bottom: 2px solid #2d2045; padding-bottom:10px;">Pedidos Reclamados por Filial/Operação</h2>
+                 <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="print-chart-filial" style="max-height:100%; max-width:100%;"></canvas>
+                 </div>
+              </div>
+            `;
+          } else if (index === 6) {
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+                 <h2 style="margin:0 0 15px 0; font-size:24px; color:#9d4edd; font-weight:800; border-bottom: 2px solid #2d2045; padding-bottom:10px;">Distribuição de Pedidos Reclamados (%)</h2>
+                 <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="print-chart-filial-percent" style="max-height:100%; max-width:100%;"></canvas>
+                 </div>
+              </div>
+            `;
+          } else if (index === 7) {
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #2d2045; padding-bottom:10px;">
+                    <h2 style="margin:0; font-size:24px; color:#9d4edd; font-weight:800;">Sobre os Casos Reclamados e Procedentes</h2>
+                    <span style="font-size:13px; color:#a69bb8; font-weight:bold;">Reclamados de Culpabilidade JM</span>
+                 </div>
+                 <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center; margin-top:15px;">
+                    <canvas id="print-chart-culp-jm" style="max-height:100%; max-width:100%;"></canvas>
+                 </div>
+              </div>
+            `;
+          } else if (index === 8) {
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #2d2045; padding-bottom:10px;">
+                    <h2 style="margin:0; font-size:24px; color:#9d4edd; font-weight:800;">Sobre os Casos Reclamados e Improcedentes</h2>
+                    <span style="font-size:13px; color:#a69bb8; font-weight:bold;">Reclamados de Culpabilidade PET LOVE (Improcedentes)</span>
+                 </div>
+                 <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center; margin-top:15px;">
+                    <canvas id="print-chart-culp-pet" style="max-height:100%; max-width:100%;"></canvas>
+                 </div>
+              </div>
+            `;
+          } else if (index === 10) {
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+                 <h2 style="margin:0 0 15px 0; font-size:24px; color:#9d4edd; font-weight:800; border-bottom: 2px solid #2d2045; padding-bottom:10px;">Evolução de Pedidos Reclamados (Histórico)</h2>
+                 <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="print-chart-evolucao" style="max-height:100%; max-width:100%;"></canvas>
+                 </div>
+              </div>
+            `;
+          } else if (index === 11) {
+            slideDiv.innerHTML = `
+              <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+                 <h2 style="margin:0 0 15px 0; font-size:24px; color:#9d4edd; font-weight:800; border-bottom: 2px solid #2d2045; padding-bottom:10px;">Comparativo Mensal de Pedidos Reclamados</h2>
+                 <div style="flex:1; position:relative; min-height:0; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="print-chart-comparativo" style="max-height:100%; max-width:100%;"></canvas>
+                 </div>
+              </div>
+            `;
+          }
+        } else {
+          slideDiv.innerHTML = `<img src="/apresentacao/slides/${slide}" alt="Slide ${index + 1}">`;
+        }
+        
+        pContainer.appendChild(slideDiv);
+      });
+      
+      renderizarGraficosImpressao(mesVal, selectedText);
+    }
+
+    function renderizarGraficosImpressao(mesVal, selectedText) {
+      printCharts.forEach(c => c.destroy());
+      printCharts = [];
+      
+      let sp = 0, bar = 0, ssz = 0;
+      dadosFiltrados.forEach(row => {
+        const reg = (row['Regional_2'] || row['Regional'] || '').trim().toUpperCase();
+        if (reg.includes('SP')) sp++;
+        else if (reg.includes('BAR')) bar++;
+        else if (reg.includes('SSZ') || reg.includes('SANTOS')) ssz++;
+      });
+      
+      const ctx6 = document.getElementById('print-chart-filial').getContext('2d');
+      printCharts.push(new Chart(ctx6, {
+        type: 'bar',
+        data: {
+          labels: ['PetLog01 São Paulo', 'PetLog05 Barueri', 'Petlog48_XPT_SSZ'],
+          datasets: [{
+            label: 'Pedidos Reclamados',
+            data: [sp, bar, ssz],
+            backgroundColor: '#9d4edd',
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, animation: false, scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } }
+      }));
+      
+      const total = sp + bar + ssz;
+      const spPct = total > 0 ? (sp / total) * 100 : 0;
+      const barPct = total > 0 ? (bar / total) * 100 : 0;
+      const sszPct = total > 0 ? (ssz / total) * 100 : 0;
+      
+      const ctx7 = document.getElementById('print-chart-filial-percent').getContext('2d');
+      printCharts.push(new Chart(ctx7, {
+        type: 'bar',
+        data: {
+          labels: ['PetLog01 São Paulo', 'PetLog05 Barueri', 'Petlog48_XPT_SSZ'],
+          datasets: [{
+            label: 'Percentual (%)',
+            data: [spPct.toFixed(2), barPct.toFixed(2), sszPct.toFixed(2)],
+            backgroundColor: '#b5179e',
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, animation: false, scales: { x: { grid: { display: false } }, y: { grid: { display: false }, ticks: { callback: v => `${v}%` } } } }
+      }));
+      
+      let naoDevolvido = 0, acareacaoNaoRealizada = 0;
+      dadosFiltrados.forEach(row => {
+        const proc = (row['Procedência'] || '').trim().toLowerCase();
+        const resp = (row['Responsavel'] || '').trim();
+        const isProcedente = proc === 'procedente' || proc === 'procédente' || (resp !== '' && proc !== 'não procedente' && proc !== 'nao procedente' && proc !== 'improcedente' && proc !== 'em analise');
+        if (isProcedente) {
+          const div = (row['Descrição da Divergência'] || row['Descrição_da_Divergência'] || '').trim().toLowerCase();
+          if (div.includes('acare')) acareacaoNaoRealizada++;
+          else naoDevolvido++;
+        }
+      });
+      
+      const ctx8 = document.getElementById('print-chart-culp-jm').getContext('2d');
+      printCharts.push(new Chart(ctx8, {
+        type: 'bar',
+        data: {
+          labels: ['Não devolvido/Após prazo', 'Acareação não realizada'],
+          datasets: [{
+            label: 'Casos',
+            data: [naoDevolvido, acareacaoNaoRealizada],
+            backgroundColor: '#ef4154',
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, animation: false, indexAxis: 'y', scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } }
+      }));
+      
+      const petCounts = {
+        'Sem Sinalização': 0, 'Pedido não embarcado': 0, 'Pedido devolvido': 0,
+        'Avaria': 0, 'Envio parcial': 0, 'Problema de etiqueta': 0,
+        'Cliente não reconhece compra': 0, 'Pedido entregue': 0, 'Outros': 0
+      };
+      dadosFiltrados.forEach(row => {
+        const proc = (row['Procedência'] || '').trim().toLowerCase();
+        const resp = (row['Responsavel'] || '').trim();
+        const isProcedente = proc === 'procedente' || proc === 'procédente' || (resp !== '' && proc !== 'não procedente' && proc !== 'nao procedente' && proc !== 'improcedente' && proc !== 'em analise');
+        if (!isProcedente && resp !== '') {
+          const div = (row['Descrição da Divergência'] || row['Descrição_da_Divergência'] || '').trim().toLowerCase();
+          if (div.includes('sinaliza')) petCounts['Sem Sinalização']++;
+          else if (div.includes('embarcado') || div.includes('embarc')) petCounts['Pedido não embarcado']++;
+          else if (div.includes('devolvido') || div.includes('devoluc')) petCounts['Pedido devolvido']++;
+          else if (div.includes('avaria') || div.includes('avariado')) petCounts['Avaria']++;
+          else if (div.includes('parcial') || div.includes('faltante')) petCounts['Envio parcial']++;
+          else if (div.includes('etiqueta')) petCounts['Problema de etiqueta']++;
+          else if (div.includes('reconhece') || div.includes('compra')) petCounts['Cliente não reconhece compra']++;
+          else if (div.includes('entregue')) petCounts['Pedido entregue']++;
+          else petCounts['Outros']++;
+        }
+      });
+      
+      const ctx9 = document.getElementById('print-chart-culp-pet').getContext('2d');
+      printCharts.push(new Chart(ctx9, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(petCounts),
+          datasets: [{
+            label: 'Casos',
+            data: Object.values(petCounts),
+            backgroundColor: '#4CAF50',
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, animation: false, indexAxis: 'y', scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } }
+      }));
+      
+      const evolMonths = {};
+      todosDados.forEach(row => {
+        const dt = row['Data do Carregamento'] || row['Data_do_Carregamento'];
+        if (dt) {
+          const partes = dt.split('/');
+          if (partes.length === 3) {
+            const m_y = `${partes[1]}/${partes[2]}`;
+            evolMonths[m_y] = (evolMonths[m_y] || 0) + 1;
+          }
+        }
+      });
+      const sortedMonths = Object.keys(evolMonths).sort((a, b) => {
+        const [mA, yA] = a.split('/').map(Number);
+        const [mB, yB] = b.split('/').map(Number);
+        return yA - yB || mA - mB;
+      });
+      let displayMonths = sortedMonths;
+      if (mesVal !== 'todos') {
+        const idx = sortedMonths.indexOf(mesVal);
+        if (idx !== -1) displayMonths = sortedMonths.slice(0, idx + 1);
+      }
+      const evolValues = displayMonths.map(m => evolMonths[m]);
+      const ctx11 = document.getElementById('print-chart-evolucao').getContext('2d');
+      printCharts.push(new Chart(ctx11, {
+        type: 'line',
+        data: {
+          labels: displayMonths,
+          datasets: [{
+            label: 'Pedidos Reclamados',
+            data: evolValues,
+            borderColor: '#9d4edd',
+            backgroundColor: 'rgba(157, 78, 221, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: { responsive: true, animation: false, scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } }
+      }));
+      
+      const select = document.getElementById('filtro-mes');
+      if (mesVal !== 'todos' && select.selectedIndex > 1) {
+        const optAtual = select.options[select.selectedIndex];
+        const optAnterior = select.options[select.selectedIndex - 1];
+        let countAtual = 0, countAnterior = 0;
+        todosDados.forEach(row => {
+          const dt = row['Data do Carregamento'] || row['Data_do_Carregamento'];
+          if (dt) {
+            const partes = dt.split('/');
+            if (partes.length === 3) {
+              const m_y = `${partes[1]}/${partes[2]}`;
+              if (m_y === optAtual.value) countAtual++;
+              else if (m_y === optAnterior.value) countAnterior++;
+            }
+          }
+        });
+        const ctx12 = document.getElementById('print-chart-comparativo').getContext('2d');
+        printCharts.push(new Chart(ctx12, {
+          type: 'bar',
+          data: {
+            labels: [optAnterior.textContent, optAtual.textContent],
+            datasets: [{
+              label: 'Volume',
+              data: [countAnterior, countAtual],
+              backgroundColor: ['#2d2045', '#9d4edd'],
+              borderRadius: 6
+            }]
+          },
+          options: { responsive: true, animation: false, scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } }
+        }));
+      }
+    }
+
+    async function baixarPDF(btn) {
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Preparando PDF...';
+      
+      setTimeout(() => {
+        prepararImpressao();
+        
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+          window.print();
+        }, 300);
+      }, 50);
+    }
+  </script>
+</body>
+</html>

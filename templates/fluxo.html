@@ -50,6 +50,9 @@
       <a href="/usuarios">Usuários</a>
       <a href="/inconsistencias">Inconsistências</a>
       {% endif %}
+      {% if session.perfil == 'Admin' %}
+      <a href="/apresentacao">Apresentação</a>
+      {% endif %}
     </div>
     <div style="display:flex; gap:15px; align-items:center;">
       <span style="font-size:13px; font-weight:bold; color:var(--muted)">Olá, {{ usuario }} ({{ perfil }})</span>

@@ -112,6 +112,10 @@
         <a href="/dashboard">Dashboard</a>
         {% if session.usuario == 'admin@jm.com' %}
         <a href="/usuarios" class="active">Usuários</a>
+        <a href="/inconsistencias">Inconsistências</a>
+        {% endif %}
+        {% if session.perfil == 'Admin' %}
+        <a href="/apresentacao">Apresentação</a>
         {% endif %}
       </div>
       <div style="display:flex; gap:15px; align-items:center;">
@@ -150,6 +154,7 @@
               <th>Nome Completo</th>
               <th>E-mail Corporativo</th>
               <th>Perfil / Acesso</th>
+              <th>Senha</th>
               <th style="width: 180px; text-align: center;">Ações</th>
             </tr>
           </thead>
@@ -268,6 +273,10 @@
             <td style="font-weight:bold; color:var(--text);">${escapeHtml(user.Nome)}</td>
             <td>${escapeHtml(user.Email)}</td>
             <td><span class="badge ${badgeClass}">${user.Perfil}</span></td>
+            <td>
+              <span class="pwd-text" data-password="${escapeHtml(user.Senha)}" style="font-family:monospace; font-size:14px; letter-spacing:2px; font-weight:bold; color:var(--text);">••••••</span>
+              <button class="btn btn-secondary btn-small" onclick="toggleRowPassword(this)" style="padding:2px 6px; font-size:11px; margin-left:8px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:4px; height:24px; vertical-align:middle; cursor:pointer;" title="Mostrar/Ocultar Senha">👁️</button>
+            </td>
             <td style="text-align:center; display:flex; gap:10px; justify-content:center; align-items:center;">
               ${botoesAcao}
             </td>
@@ -314,6 +323,20 @@
       }
     }
 
+    function toggleRowPassword(btn) {
+      const span = btn.previousElementSibling;
+      const pwd = span.getAttribute('data-password');
+      if (span.textContent === '••••••') {
+        span.textContent = pwd;
+        btn.textContent = '🔒';
+        btn.title = "Ocultar Senha";
+      } else {
+        span.textContent = '••••••';
+        btn.textContent = '👁️';
+        btn.title = "Mostrar Senha";
+      }
+    }
+
     function abrirModalNovo() {
       document.getElementById('modal-titulo').textContent = 'Novo Usuário';
       document.getElementById('user-email').value = '';
@@ -356,6 +379,7 @@
       const perfil = document.getElementById('user-perfil').value;
       const senha = document.getElementById('user-senha').value;
       const isEdit = document.getElementById('user-email').disabled;
+      const btn = document.getElementById('btn-submit');
       btn.disabled = true;
       
       try {
