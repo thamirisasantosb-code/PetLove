@@ -2235,8 +2235,22 @@ def api_financeiro_dados():
                     badge_triangulacao = "⏳ Desconto em Análise"
             else:
                 status_triangulacao = "Pendente de Desconto"
-                badge_triangulacao = "⚠️ Acareação Sem Desconto"
-                
+            # Categoria de Responsabilidade do Custo (Custo JM x Descontado Motorista)
+            origem_file_lower = (d.get("origem_arquivo") or "").lower()
+            is_previa_file = any(w in origem_file_lower for w in ['prévia', 'previa', 'perda', 'perdas', 'gerot_previa'])
+            is_pagos_file = any(w in origem_file_lower for w in ['pago', 'pagos', 'efetivado', 'extravio', 'desconto']) or not is_previa_file
+
+            if status_envio == "Enviado para Desconto":
+                if is_previa_file and not is_pagos_file:
+                    responsabilidade_custo = "Custo JM"
+                    badge_custo = "🏢 Custo JM"
+                else:
+                    responsabilidade_custo = "Descontado Motorista"
+                    badge_custo = "🟢 Descontado Motorista"
+            else:
+                responsabilidade_custo = "Pendente Financeiro"
+                badge_custo = "⏳ Pendente Financeiro"
+
             items.append({
                 "pedido_id": pid,
                 "status_envio": status_envio,
@@ -2256,6 +2270,8 @@ def api_financeiro_dados():
                 "motivo": d.get("motivo") or "",
                 "status_triangulacao": status_triangulacao,
                 "badge_triangulacao": badge_triangulacao,
+                "responsabilidade_custo": responsabilidade_custo,
+                "badge_custo": badge_custo,
                 "tem_chamado": tem_chamado,
                 "status_chamado": status_trat or ("Em Andamento" if tem_chamado else "Não Cadastrado"),
                 "procedencia": proc_norm,
@@ -2273,6 +2289,12 @@ def api_financeiro_dados():
         val_desc_contestavel = sum(it["valor_desconto_num"] for it in items if it["status_triangulacao"] == "Cobrança Indevida / Contestada")
         val_pend_desconto = sum(it["valor_desconto_num"] for it in items if it["status_triangulacao"] == "Pendente de Desconto")
         
+        val_custo_jm = sum(it["valor_desconto_num"] for it in items if it["responsabilidade_custo"] == "Custo JM")
+        qtd_custo_jm = sum(1 for it in items if it["responsabilidade_custo"] == "Custo JM")
+        
+        val_descontado_mot = sum(it["valor_desconto_num"] for it in items if it["responsabilidade_custo"] == "Descontado Motorista")
+        qtd_descontado_mot = sum(1 for it in items if it["responsabilidade_custo"] == "Descontado Motorista")
+
         resumo = {
             "total_registros": len(items),
             "valor_total": valor_enviados + valor_nao_enviados,
@@ -2295,7 +2317,11 @@ def api_financeiro_dados():
             "qtd_desconto_contestavel": sum(1 for it in items if it["status_triangulacao"] == "Cobrança Indevida / Contestada"),
             "valor_desconto_contestavel": val_desc_contestavel,
             "qtd_pendente_desconto": sum(1 for it in items if it["status_triangulacao"] == "Pendente de Desconto"),
-            "valor_pendente_desconto": val_pend_desconto
+            "valor_pendente_desconto": val_pend_desconto,
+            "qtd_custo_jm": qtd_custo_jm,
+            "valor_custo_jm": val_custo_jm,
+            "qtd_descontado_motorista": qtd_descontado_mot,
+            "valor_descontado_motorista": val_descontado_mot
         }
         
         return jsonify(registros=items, resumo=resumo, periodos=periodos_list)

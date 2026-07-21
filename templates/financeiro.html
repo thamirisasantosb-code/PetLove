@@ -238,6 +238,8 @@
         <option value="Não Procedente">Contestados / estornos</option>
         <option value="Em Análise">Em análise</option>
         <option value="desconto_sem_chamado">Descontos sem acareação</option>
+        <option value="custo_jm">Custo JM (não descontado do motorista)</option>
+        <option value="descontado_motorista">Descontado motorista (consta em Base Pagos)</option>
       </select>
     </div>
 
@@ -311,6 +313,18 @@
             <div style="font-size:12px; font-weight:800; color:#2c5282; text-transform:uppercase; letter-spacing:0.5px;">⚠️ Acareação Sem Desconto</div>
             <div style="font-size:24px; font-weight:900; color:#2c5282; margin:6px 0;" id="conf-pendente-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#2b6cb0;" id="conf-pendente-qtd">0 chamados pendentes financeiro</div>
+          </div>
+
+          <div style="background:#edf2f7; border:1px solid #cbd5e0; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('custo_jm')">
+            <div style="font-size:12px; font-weight:800; color:#2d3748; text-transform:uppercase; letter-spacing:0.5px;">🏢 Custo JM (Não Descontado)</div>
+            <div style="font-size:24px; font-weight:900; color:#2d3748; margin:6px 0;" id="conf-custo-jm-val">R$ 0,00</div>
+            <div style="font-size:12px; font-weight:700; color:#4a5568;" id="conf-custo-jm-qtd">0 perdas absorvidas pela empresa</div>
+          </div>
+
+          <div style="background:#e6fffa; border:1px solid #81e6d9; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('descontado_motorista')">
+            <div style="font-size:12px; font-weight:800; color:#234e52; text-transform:uppercase; letter-spacing:0.5px;">🟢 Descontado Motorista (Base Pagos)</div>
+            <div style="font-size:24px; font-weight:900; color:#234e52; margin:6px 0;" id="conf-descontado-mot-val">R$ 0,00</div>
+            <div style="font-size:12px; font-weight:700; color:#2c7a7b;" id="conf-descontado-mot-qtd">0 descontos efetuados ao motorista</div>
           </div>
         </div>
       </div>
@@ -593,6 +607,12 @@
 
       setElementText('conf-pendente-val', formatMoeda(resumoDados.valor_pendente_desconto));
       setElementText('conf-pendente-qtd', `${resumoDados.qtd_pendente_desconto || 0} chamados pendentes financeiro`);
+
+      setElementText('conf-custo-jm-val', formatMoeda(resumoDados.valor_custo_jm));
+      setElementText('conf-custo-jm-qtd', `${resumoDados.qtd_custo_jm || 0} perdas absorvidas pela empresa`);
+
+      setElementText('conf-descontado-mot-val', formatMoeda(resumoDados.valor_descontado_motorista));
+      setElementText('conf-descontado-mot-qtd', `${resumoDados.qtd_descontado_motorista || 0} descontos efetuados ao motorista`);
     }
 
     function atualizarBarometro(registrosFiltrados) {
@@ -809,6 +829,10 @@
         if (visaoGerencialAtiva !== 'todos') {
           if (visaoGerencialAtiva === 'desconto_sem_chamado') {
             matchVisao = (r.status_triangulacao === 'Desconto sem Acareação');
+          } else if (visaoGerencialAtiva === 'custo_jm') {
+            matchVisao = (r.responsabilidade_custo === 'Custo JM');
+          } else if (visaoGerencialAtiva === 'descontado_motorista') {
+            matchVisao = (r.responsabilidade_custo === 'Descontado Motorista');
           } else if (visaoGerencialAtiva === 'Enviado para Desconto' || visaoGerencialAtiva === 'Não Enviado') {
             matchVisao = (r.status_envio === visaoGerencialAtiva);
           } else {
