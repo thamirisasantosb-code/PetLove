@@ -2137,17 +2137,25 @@ def api_financeiro_dados():
             except:
                 return 0.0
 
-        def calc_quinzena(dt_str):
-            if not dt_str: return "", "", (0, 0, 0)
+        def calc_quinzena(d_row):
+            dt_str = d_row.get("data_reclamacao") or d_row.get("data_carregamento") or d_row.get("Data_do_Carregamento") or ""
+            if not dt_str or str(dt_str).strip() == "":
+                origem = str(d_row.get("origem_arquivo") or "").lower()
+                if "maio" in origem: dt_str = "15/05/2026"
+                elif "abril" in origem: dt_str = "15/04/2026"
+                elif "junho" in origem: dt_str = "15/06/2026"
+                elif "julho" in origem: dt_str = "15/07/2026"
+                else: dt_str = d_row.get("data_importacao") or "15/05/2026"
+
             dt_str = str(dt_str).strip()
             dt = None
-            for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d/%m/%y', '%Y/%m/%d'):
+            for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d/%m/%y', '%Y/%m/%d', '%d/%m/%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S'):
                 try:
                     dt = datetime.datetime.strptime(dt_str[:10], fmt)
                     break
                 except: pass
             if not dt:
-                return "", "", (0, 0, 0)
+                dt = datetime.datetime(2026, 5, 15)
             
             nomes_meses = {
                 1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
@@ -2182,8 +2190,7 @@ def api_financeiro_dados():
                 qtd_nao_enviados += 1
                 valor_nao_enviados += val_desc_num
             
-            dt_ref = d.get("data_carregamento") or d.get("data_reclamacao") or ""
-            q_code, q_label, sort_key = calc_quinzena(dt_ref)
+            q_code, q_label, sort_key = calc_quinzena(d)
             if q_code and q_code not in periodos_dict:
                 periodos_dict[q_code] = {"code": q_code, "label": q_label, "sort": sort_key}
             
