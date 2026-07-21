@@ -771,42 +771,6 @@
               <div class="meter-segment bg-accent" style="width: ${pctWidth.toFixed(1)}%;"></div>
             </div>
           `;
-          qContainer.appendChild(box);
-        });
-      }
-
-      // 4. Barômetro Ranking Regional
-      const regMap = {};
-      registrosFiltrados.forEach(r => {
-        const reg = (r.regional || 'Não Informado').trim().toUpperCase();
-        if (!regMap[reg]) regMap[reg] = { val: 0, qtd: 0 };
-        regMap[reg].val += (r.valor_desconto_num || 0);
-        regMap[reg].qtd += 1;
-      });
-
-      const sortedRegs = Object.keys(regMap).sort((a,b) => regMap[b].val - regMap[a].val);
-      const maxRegVal = sortedRegs.length > 0 ? regMap[sortedRegs[0]].val : 1;
-      const regContainer = document.getElementById('barometro-regionais-container');
-
-      if (regContainer) {
-        regContainer.innerHTML = '';
-        sortedRegs.forEach(reg => {
-          const data = regMap[reg];
-          const pctWidth = (data.val / maxRegVal * 100);
-
-          const rItem = document.createElement('div');
-          rItem.className = 'regional-item';
-          rItem.innerHTML = `
-            <div class="regional-info">
-              <span>🏢 ${escapeHtml(reg)}</span>
-              <span>${formatMoeda(data.val)} (${data.qtd} ocorrencias)</span>
-            </div>
-            <div class="meter-bar-outer" style="height: 12px;">
-              <div class="meter-segment bg-accent" style="width: ${pctWidth.toFixed(1)}%;"></div>
-            </div>
-          `;
-          regContainer.appendChild(rItem);
-        });
       }
     }
 
