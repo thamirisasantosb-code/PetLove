@@ -16,15 +16,19 @@ BASE_DADOS_DIR = Path(os.getenv("BASE_DADOS_DIR", Path(__file__).parent / "Base 
 DB_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent / "petlove.db"))
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "petlove_jm_secret_key_2026_" + str(os.urandom(8).hex()))
+app.secret_key = os.getenv("SECRET_KEY", "petlove_jm_secret_key_2026_fixed_session_key")
+app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=30)
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'usuario' not in session:
+            if request.path.startswith('/api/') or request.is_json:
+                return jsonify(erro="Sessão expirada. Por favor, faça login novamente.", redirecionar="/login"), 401
             return redirect(url_for('login', proxima=request.path))
         return f(*args, **kwargs)
     return decorated_function
+
 
 def buscar_lista_por_pedido(pedido):
     base_dir = BASE_DADOS_DIR
@@ -72,19 +76,46 @@ EXPORT_DIR.mkdir(exist_ok=True)
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         senha = request.form.get("senha", "").strip()
         
         csv_path = BASE_DADOS_DIR / "usuarios.csv"
         if csv_path.exists():
-            with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
-                leitor = csv.DictReader(f)
-                for user in leitor:
-                    if user.get("Email") == email and user.get("Senha") == senha:
-                        session['usuario'] = email
-                        session['nome'] = user.get("Nome")
-                        session['perfil'] = user.get("Perfil")
-                        return redirect(request.args.get("proxima") or url_for('index'))
+            # Tenta utf-8-sig primeiro (lida com BOM do Excel/Windows) e depois utf-8
+            for encoding in ('utf-8-sig', 'utf-8', 'latin-1'):
+                try:
+                    with open(csv_path, newline='', encoding=encoding, errors='ignore') as f:
+                        leitor = csv.DictReader(f)
+                        for user in leitor:
+                            # Limpa chaves e valores (remove espaços e BOM residuais)
+                            user_clean = {}
+                            for k, v in user.items():
+                                if k is None:
+                                    continue
+                                k_clean = k.strip().lstrip('\ufeff').lower()
+                                user_clean[k_clean] = str(v).strip() if v else ""
+                            
+                            row_email = (user_clean.get("email") or "").lower()
+                            row_senha = user_clean.get("senha") or ""
+                            
+                            if not row_email:
+                                continue
+                            
+                            is_match = (row_email == email)
+                            
+                            if is_match and row_senha == senha:
+                                session.permanent = True
+                                session['usuario'] = row_email
+                                session['nome'] = (user_clean.get("nome") or email.split("@")[0].title()).strip()
+                                raw_perfil = (user_clean.get("perfil") or "Usuario").strip()
+                                # Normaliza: se for 'admin' (qualquer case), salva como 'Admin'
+                                if raw_perfil.lower() == "admin":
+                                    raw_perfil = "Admin"
+                                session['perfil'] = raw_perfil
+                                return redirect(request.args.get("proxima") or url_for('index'))
+                    break  # Se leu sem erro, para de tentar outros encodings
+                except Exception:
+                    continue
                         
         return render_template("login.html", erro="Credenciais inválidas")
         
@@ -100,36 +131,50 @@ def solicitar_acesso():
     import random
     import string
     dados = request.get_json(silent=True) or {}
-    email = dados.get("email", "").strip()
+    email = dados.get("email", "").strip().lower()
     
     if not email or "@" not in email:
         return jsonify(erro="E-mail inválido."), 400
         
     csv_path = BASE_DADOS_DIR / "usuarios.csv"
+    campos = ["Email", "Senha", "Perfil", "Nome"]
+    linhas_existentes = []
     
-    # Verifica se já existe
     if csv_path.exists():
-        with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+        with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
             leitor = csv.DictReader(f)
             for row in leitor:
-                if row.get("Email") == email:
+                row_clean = {}
+                for k, v in row.items():
+                    if k:
+                        row_clean[k.strip().lstrip('\ufeff')] = str(v).strip() if v else ""
+                
+                row_email = (row_clean.get("Email") or row_clean.get("email") or "").lower()
+                if row_email == email:
                     return jsonify(erro="Este e-mail já possui cadastro."), 400
+                linhas_existentes.append(row_clean)
                     
     # Gera senha de 6 caracteres aleatórios
     senha_gerada = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
     
     # Extrai o nome a partir do email (antes do @)
     nome = email.split("@")[0].replace(".", " ").title()
-    
-    # Adiciona ao CSV
-    modo = 'a' if csv_path.exists() else 'w'
-    with open(csv_path, modo, newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        if modo == 'w':
-            writer.writerow(["Email", "Senha", "Perfil", "Nome"])
-        writer.writerow([email, senha_gerada, "Usuario", nome])
-        
+
+    linhas_existentes.append({
+        "Email": email,
+        "Senha": senha_gerada,
+        "Perfil": "Usuario",
+        "Nome": nome
+    })
+
+    with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=campos, extrasaction='ignore')
+        writer.writeheader()
+        for row in linhas_existentes:
+            writer.writerow(row)
+
     return jsonify(sucesso=True, senha=senha_gerada)
+
 
 
 @app.get("/")
@@ -191,8 +236,13 @@ def fluxo():
 
 def get_db_connection():
     db_path = DB_PATH
-    conn = sqlite3.connect(db_path, timeout=30.0)
+    conn = sqlite3.connect(db_path, timeout=60.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=60000;")
+    except Exception:
+        pass
     return conn
 
 def get_db():
@@ -221,10 +271,26 @@ try:
             data_criacao TEXT
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS descontos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pedido_id TEXT UNIQUE,
+            data_reclamacao TEXT,
+            data_carregamento TEXT,
+            motorista TEXT,
+            regional TEXT,
+            rota TEXT,
+            placa TEXT,
+            valor_desconto TEXT,
+            origem_arquivo TEXT,
+            data_importacao TEXT,
+            observacao TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 except Exception as e:
-    print(f"Erro ao inicializar tabela recuperacao_senha: {e}")
+    print(f"Erro ao inicializar tabelas SQLite: {e}")
 
 def atualizar_senha_csv(email, nova_senha):
     csv_path = BASE_DADOS_DIR / "usuarios.csv"
@@ -233,26 +299,33 @@ def atualizar_senha_csv(email, nova_senha):
     
     linhas = []
     atualizado = False
-    campos = ["Email", "Senha", "Perfil", "Nome"] # colunas padrão
+    campos = ["Email", "Senha", "Perfil", "Nome"]
+    target_email = str(email or "").strip().lower()
     
-    with open(csv_path, mode='r', newline='', encoding='utf-8', errors='ignore') as f:
+    with open(csv_path, mode='r', newline='', encoding='utf-8-sig', errors='ignore') as f:
         leitor = csv.DictReader(f)
-        if leitor.fieldnames:
-            campos = leitor.fieldnames
         for row in leitor:
-            if row.get("Email") == email:
-                row["Senha"] = nova_senha
+            row_clean = {}
+            for k, v in row.items():
+                if k:
+                    k_clean = k.strip().lstrip('\ufeff')
+                    row_clean[k_clean] = str(v).strip() if v else ""
+            
+            row_email = (row_clean.get("Email") or row_clean.get("email") or "").lower()
+            if row_email == target_email:
+                row_clean["Senha"] = nova_senha
                 atualizado = True
-            linhas.append(row)
+            linhas.append(row_clean)
             
     if atualizado:
         with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
-            escritor = csv.DictWriter(f, fieldnames=campos)
+            escritor = csv.DictWriter(f, fieldnames=campos, extrasaction='ignore')
             escritor.writeheader()
             for row in linhas:
                 escritor.writerow(row)
         return True
     return False
+
 
 # smtplib e email.mime já importados no topo do arquivo
 
@@ -447,39 +520,83 @@ def definir_senha():
             
     return render_template("definir_senha.html")
 
+def is_admin():
+    user = str(session.get("usuario", "")).strip().lower()
+    perfil = str(session.get("perfil", "")).strip().lower()
+    if perfil == "admin" or user == "admin@jm.com":
+        return True
+    if user:
+        csv_path = BASE_DADOS_DIR / "usuarios.csv"
+        if csv_path.exists():
+            try:
+                for enc in ('utf-8-sig', 'utf-8', 'latin-1'):
+                    try:
+                        with open(csv_path, newline='', encoding=enc, errors='ignore') as f:
+                            leitor = csv.DictReader(f)
+                            for row in leitor:
+                                u_clean = {}
+                                for k, v in row.items():
+                                    if k: u_clean[k.strip().lstrip('\ufeff').lower()] = str(v).strip()
+                                u_email = (u_clean.get("email") or "").lower()
+                                u_perfil = (u_clean.get("perfil") or "").lower()
+                                if u_email == user and u_perfil == "admin":
+                                    session['perfil'] = "Admin"
+                                    return True
+                        break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+    return False
+
+@app.context_processor
+def inject_is_admin():
+    return dict(is_admin=is_admin())
+
 @app.route("/usuarios")
 @login_required
 def usuarios_dashboard():
-    if session.get("usuario") != "admin@jm.com":
-        return render_template("login.html", erro="Acesso não autorizado. Apenas o administrador principal (admin@jm.com) pode gerenciar usuários."), 403
+    if not is_admin():
+        return redirect(url_for('gestao'))
     return render_template("usuarios.html", usuario=session.get('nome'), perfil=session.get('perfil'))
 
 @app.route("/api/usuarios")
 @login_required
 def api_listar_usuarios():
-    if session.get("usuario") != "admin@jm.com":
-        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
         
     csv_path = BASE_DADOS_DIR / "usuarios.csv"
     if not csv_path.exists():
         return jsonify([])
         
     usuarios = []
-    with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+    with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
         leitor = csv.DictReader(f)
         for row in leitor:
+            row_clean = {}
+            for k, v in row.items():
+                if k:
+                    k_clean = k.strip().lstrip('\ufeff')
+                    row_clean[k_clean] = str(v).strip() if v else ""
+            
+            row_email = row_clean.get("Email") or row_clean.get("email") or ""
+            if not row_email:
+                continue
+                
             usuarios.append({
-                "Email": row.get("Email"),
-                "Nome": row.get("Nome"),
-                "Perfil": row.get("Perfil")
+                "Email": row_email,
+                "Nome": row_clean.get("Nome") or row_clean.get("nome") or "",
+                "Perfil": row_clean.get("Perfil") or row_clean.get("perfil") or "Usuario",
+                "Senha": row_clean.get("Senha") or row_clean.get("senha") or ""
             })
     return jsonify(usuarios)
 
 @app.route("/api/usuarios/salvar", methods=["POST"])
 @login_required
 def api_salvar_usuario():
-    if session.get("usuario") != "admin@jm.com":
-        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
         
     dados = request.get_json(silent=True) or {}
     email = dados.get("email", "").strip().lower()
@@ -502,21 +619,25 @@ def api_salvar_usuario():
     email_existe = False
     
     if csv_path.exists():
-        with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+        with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
             leitor = csv.DictReader(f)
-            if leitor.fieldnames:
-                campos = leitor.fieldnames
             for row in leitor:
-                row_email = str(row.get("Email", "")).strip().lower()
+                row_clean = {}
+                for k, v in row.items():
+                    if k:
+                        k_clean = k.strip().lstrip('\ufeff')
+                        row_clean[k_clean] = str(v).strip() if v else ""
+                
+                row_email = (row_clean.get("Email") or row_clean.get("email") or "").lower()
                 if row_email == email:
                     email_existe = True
                     if is_edit:
-                        row["Nome"] = nome
-                        row["Perfil"] = perfil
+                        row_clean["Nome"] = nome
+                        row_clean["Perfil"] = perfil
                         if senha:
-                            row["Senha"] = senha
+                            row_clean["Senha"] = senha
                         editado = True
-                linhas.append(row)
+                linhas.append(row_clean)
                 
     if not is_edit and email_existe:
         return jsonify(erro="Este e-mail de usuário já está cadastrado. Para alterá-lo, use o botão Editar na listagem."), 400
@@ -538,11 +659,10 @@ def api_salvar_usuario():
     # Grava de volta no CSV
     try:
         with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
-            escritor = csv.DictWriter(f, fieldnames=campos)
+            escritor = csv.DictWriter(f, fieldnames=campos, extrasaction='ignore')
             escritor.writeheader()
             for row in linhas:
-                # Normalizar e-mail da gravação
-                row["Email"] = str(row.get("Email", "")).strip().lower()
+                row["Email"] = str(row.get("Email") or row.get("email") or "").strip().lower()
                 escritor.writerow(row)
         return jsonify(sucesso=True)
     except Exception as e:
@@ -551,8 +671,8 @@ def api_salvar_usuario():
 @app.route("/api/usuarios/deletar", methods=["POST"])
 @login_required
 def api_deletar_usuario():
-    if session.get("usuario") != "admin@jm.com":
-        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
         
     dados = request.get_json(silent=True) or {}
     email = dados.get("email", "").strip().lower()
@@ -572,29 +692,34 @@ def api_deletar_usuario():
     deletado = False
     campos = ["Email", "Senha", "Perfil", "Nome"]
     
-    with open(csv_path, newline='', encoding='utf-8', errors='ignore') as f:
+    with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
         leitor = csv.DictReader(f)
-        if leitor.fieldnames:
-            campos = leitor.fieldnames
         for row in leitor:
-            row_email = str(row.get("Email", "")).strip().lower()
+            row_clean = {}
+            for k, v in row.items():
+                if k:
+                    k_clean = k.strip().lstrip('\ufeff')
+                    row_clean[k_clean] = str(v).strip() if v else ""
+            
+            row_email = (row_clean.get("Email") or row_clean.get("email") or "").lower()
             if row_email == email:
                 deletado = True
                 continue
-            linhas.append(row)
+            linhas.append(row_clean)
             
     if not deletado:
         return jsonify(erro="Usuário não encontrado."), 404
         
     try:
         with open(csv_path, mode='w', newline='', encoding='utf-8') as f:
-            escritor = csv.DictWriter(f, fieldnames=campos)
+            escritor = csv.DictWriter(f, fieldnames=campos, extrasaction='ignore')
             escritor.writeheader()
             for row in linhas:
                 escritor.writerow(row)
         return jsonify(sucesso=True)
     except Exception as e:
         return jsonify(erro=f"Erro ao excluir usuário: {str(e)}"), 500
+
 
 def sincronizar_pasta_tms():
     db_path = DB_PATH
@@ -736,8 +861,8 @@ def sincronizar_pasta_tms():
 @app.route("/api/tms/sincronizar", methods=["POST"])
 @login_required
 def api_sincronizar_tms():
-    if session.get("usuario") != "admin@jm.com":
-        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
         
     try:
         total_novos, total_lidos, erro = sincronizar_pasta_tms()
@@ -827,15 +952,15 @@ def obter_inconsistencias():
 @app.route("/inconsistencias")
 @login_required
 def inconsistencias_dashboard():
-    if session.get("usuario") != "admin@jm.com":
-        return render_template("login.html", erro="Acesso não autorizado. Apenas o administrador principal (admin@jm.com) pode gerenciar inconsistências."), 403
+    if not is_admin():
+        return redirect(url_for('gestao'))
     return render_template("inconsistencias.html", usuario=session.get('nome'), perfil=session.get('perfil'))
 
 @app.route("/api/inconsistencias")
 @login_required
 def api_inconsistencias():
-    if session.get("usuario") != "admin@jm.com":
-        return jsonify(erro="Acesso negado. Apenas o administrador principal pode realizar esta ação."), 403
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
     try:
         dados = obter_inconsistencias()
         return jsonify(dados)
@@ -969,15 +1094,17 @@ def fluxo_atualizar():
         resp_clean = novo_resp.strip() if novo_resp else ""
         
         # Determinar se o chamado deve estar finalizado
-        tem_procedencia_valida = proc_clean and proc_clean not in ["em analise", "em análise"]
-        if resp_clean or trat_clean or tem_procedencia_valida:
-            novo_status = "Finalizado"
-        elif was_finalizado:
-            # PROTEÇÃO: Se já estava Finalizado, mantém Finalizado por segurança
-            # Impede regressão acidental de status
-            novo_status = "Finalizado"
-        else:
-            novo_status = "Em Andamento"
+        novo_status = dados.get("status")
+        if not novo_status or novo_status not in ["Em Andamento", "Finalizado"]:
+            tem_procedencia_valida = proc_clean and proc_clean not in ["em analise", "em análise"]
+            if resp_clean or trat_clean or tem_procedencia_valida:
+                novo_status = "Finalizado"
+            elif was_finalizado:
+                # PROTEÇÃO: Se já estava Finalizado, mantém Finalizado por segurança
+                # Impede regressão acidental de status
+                novo_status = "Finalizado"
+            else:
+                novo_status = "Em Andamento"
             
         # 2. Executar o UPDATE
         sql = f"""
@@ -1074,12 +1201,184 @@ def fluxo_atualizar_romaneio():
     except Exception as e:
         return jsonify(erro=str(e)), 500
 
+@app.post("/api/fluxo/atualizar_status")
+@login_required
+def fluxo_atualizar_status():
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    novo_status = str(dados.get("status", "")).strip()
+    usuario = session.get('nome', 'Usuário')
+    
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+    if novo_status not in ["Em Andamento", "Finalizado"]:
+        return jsonify(erro="Status inválido."), 400
+        
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify(erro="Pedido não encontrado."), 404
+            
+        col_names = [description[0] for description in cursor.description]
+        col_status = next((c for c in col_names if 'Status' in c), 'Status_da_Tratativa')
+        
+        valores_antigos = dict(row)
+        valor_antigo = valores_antigos.get(col_status) or ""
+        
+        if str(valor_antigo).strip() == novo_status:
+            return jsonify(sucesso=True)
+            
+        # Executa atualização
+        cursor.execute(f'UPDATE chamados SET "{col_status}" = ? WHERE ID_do_Pedido = ?', (novo_status, pedido))
+        
+        # Registrar no histórico
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (pedido, data_hora, usuario, "Status da Tratativa", valor_antigo if valor_antigo else "Vazio", novo_status))
+        
+        conn.commit()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/fluxo/atualizar_justificativa")
+@login_required
+def fluxo_atualizar_justificativa():
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    nova_justif = str(dados.get("justificativa", "")).strip()
+    usuario = session.get('nome', 'Usuário')
+    
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+        
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify(erro="Pedido não encontrado."), 404
+            
+        col_names = [description[0] for description in cursor.description]
+        col_justif = next((c for c in col_names if 'Justificativa' in c), 'Justificativa')
+        
+        valores_antigos = dict(row)
+        valor_antigo = valores_antigos.get(col_justif) or ""
+        
+        if str(valor_antigo).strip() == nova_justif:
+            return jsonify(sucesso=True)
+            
+        cursor.execute(f'UPDATE chamados SET "{col_justif}" = ? WHERE ID_do_Pedido = ?', (nova_justif, pedido))
+        
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (pedido, data_hora, usuario, "Justificativa", valor_antigo if valor_antigo else "Vazio", nova_justif))
+        
+        conn.commit()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/fluxo/atualizar_tratativa")
+@login_required
+def fluxo_atualizar_tratativa():
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    nova_tratativa = str(dados.get("tratativa", "")).strip()
+    usuario = session.get('nome', 'Usuário')
+    
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+        
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify(erro="Pedido não encontrado."), 404
+            
+        col_names = [description[0] for description in cursor.description]
+        col_trat = next((c for c in col_names if 'Tratativa' in c), 'Tratativa')
+        
+        valores_antigos = dict(row)
+        valor_antigo = valores_antigos.get(col_trat) or ""
+        
+        if str(valor_antigo).strip() == nova_tratativa:
+            return jsonify(sucesso=True)
+            
+        cursor.execute(f'UPDATE chamados SET "{col_trat}" = ? WHERE ID_do_Pedido = ?', (nova_tratativa, pedido))
+        
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (pedido, data_hora, usuario, "Tratativa", valor_antigo if valor_antigo else "Vazio", nova_tratativa))
+        
+        conn.commit()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/fluxo/atualizar_procedencia")
+@login_required
+def fluxo_atualizar_procedencia():
+    dados = request.get_json(silent=True) or {}
+    pedido = str(dados.get("pedido", "")).strip()
+    nova_procedencia = str(dados.get("procedencia", "")).strip()
+    usuario = session.get('nome', 'Usuário')
+    
+    if not pedido:
+        return jsonify(erro="Pedido não informado."), 400
+        
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM chamados WHERE ID_do_Pedido = ?", (pedido,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify(erro="Pedido não encontrado."), 404
+            
+        col_names = [description[0] for description in cursor.description]
+        col_proc = next((c for c in col_names if 'Proced' in c), 'Procedência')
+        
+        valores_antigos = dict(row)
+        valor_antigo = valores_antigos.get(col_proc) or ""
+        
+        if str(valor_antigo).strip() == nova_procedencia:
+            return jsonify(sucesso=True)
+            
+        cursor.execute(f'UPDATE chamados SET "{col_proc}" = ? WHERE ID_do_Pedido = ?', (nova_procedencia, pedido))
+        
+        data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (pedido, data_hora, usuario, "Procedência", valor_antigo if valor_antigo else "Vazio", nova_procedencia))
+        
+        conn.commit()
+        return jsonify(sucesso=True)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
 @app.post("/api/fluxo/deletar")
 @login_required
 def fluxo_deletar():
-    if session.get('usuario') != 'admin@jm.com':
-        return jsonify(erro="Apenas o administrador admin@jm.com pode excluir chamados."), 403
-        
+    if not is_admin():
+        return jsonify(erro="Apenas administradores podem excluir chamados."), 403
+
     dados = request.get_json(silent=True) or {}
     pedido = str(dados.get("pedido", "")).strip()
     if not pedido:
@@ -1102,8 +1401,8 @@ def fluxo_deletar():
 @app.post("/api/fluxo/atualizar_campos_admin")
 @login_required
 def fluxo_atualizar_campos_admin():
-    if session.get('usuario') != 'admin@jm.com':
-        return jsonify(erro="Apenas o administrador admin@jm.com pode editar estes campos."), 403
+    if not is_admin():
+        return jsonify(erro="Apenas administradores podem editar estes campos."), 403
         
     dados = request.get_json(silent=True) or {}
     pedido = str(dados.get("pedido", "")).strip()
@@ -1496,8 +1795,8 @@ def dashboard():
 @app.get("/apresentacao")
 @login_required
 def apresentacao():
-    if session.get("perfil") != "Admin":
-        return render_template("login.html", erro="Acesso não autorizado. Apenas administradores podem visualizar a apresentação."), 403
+    if not is_admin():
+        return redirect(url_for('gestao'))
     
     # Listar e ordenar os slides numericamente
     diretorio = Path(__file__).parent / "PPT" / "Apresentação de fechamento de perdas- PET LOVE- março 2026"
@@ -1550,8 +1849,6 @@ def gerar_apresentacao_pdf():
         match = re.search(r"Slide(\d+)", caminho.name, re.IGNORECASE)
         return int(match.group(1)) if match else 0
         
-    arquivos.sort(key=extrair_numero)
-    
     imagens = []
     for arq in arquivos:
         try:
@@ -1566,10 +1863,483 @@ def gerar_apresentacao_pdf():
         return "Erro ao processar as imagens.", 500
         
     pdf_destino = EXPORT_DIR / "apresentacao_fechamento_perdas_marco_2026.pdf"
-    
     imagens[0].save(pdf_destino, save_all=True, append_images=imagens[1:])
     
     return send_from_directory(EXPORT_DIR, pdf_destino.name, as_attachment=True)
+
+def sincronizar_descontos_base():
+    db_path = DB_PATH
+    descontos_dir = BASE_DADOS_DIR.parent / "Descontos"
+    if not descontos_dir.exists():
+        descontos_dir.mkdir(parents=True, exist_ok=True)
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS descontos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pedido_id TEXT UNIQUE,
+            data_reclamacao TEXT,
+            data_carregamento TEXT,
+            motorista TEXT,
+            regional TEXT,
+            rota TEXT,
+            placa TEXT,
+            valor_desconto TEXT,
+            origem_arquivo TEXT,
+            data_importacao TEXT,
+            observacao TEXT,
+            operacao TEXT,
+            motivo TEXT
+        )
+    ''')
+    cursor.execute("PRAGMA table_info(descontos)")
+    existing_cols = [c[1] for c in cursor.fetchall()]
+    if 'operacao' not in existing_cols:
+        cursor.execute("ALTER TABLE descontos ADD COLUMN operacao TEXT")
+    if 'motivo' not in existing_cols:
+        cursor.execute("ALTER TABLE descontos ADD COLUMN motivo TEXT")
+    
+    # Busca automática em diretórios de sincronização do OneDrive, Downloads, pasta Descontos e Histórico
+    desconto_files = []
+    search_dirs = [
+        descontos_dir,
+        descontos_dir / "Arquivo_Historico",
+        Path.home() / "OneDrive - JM DISTRIBUIÇÃO",
+        Path.home() / "OneDrive - JM DISTRIBUIÇÃO" / "Área de Trabalho",
+        Path.home() / "Downloads",
+        BASE_DADOS_DIR.parent
+    ]
+    
+    for sdir in search_dirs:
+        if sdir.exists():
+            for f in sdir.glob("*.xlsx"):
+                fname = f.name.lower()
+                if any(w in fname for w in ['desconto', 'extravio', 'perda', 'prévia', 'previa', 'petlove', 'pet love']):
+                    if f not in desconto_files and 'dashboard_acariacoes' not in fname and 'modelo' not in fname:
+                        desconto_files.append(f)
+                        
+    import openpyxl, datetime
+    now_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    
+    total_lidos = 0
+    total_importados = 0
+    
+    if desconto_files:
+        cursor.execute("DELETE FROM descontos")
+        
+        for filepath in desconto_files:
+            filename = filepath.name
+            try:
+                wb = openpyxl.load_workbook(filepath, data_only=True)
+                sheet_names = [s for s in wb.sheetnames if any(w in s.lower() for w in ['petlove', 'pet love', 'desconto', 'extravio', 'perda', 'acareação', 'acareacao'])]
+                if not sheet_names and len(wb.sheetnames) == 1:
+                    sheet_names = wb.sheetnames
+                    
+                for sname in sheet_names:
+                    ws = wb[sname]
+                    rows = list(ws.iter_rows(values_only=True))
+                    if not rows: continue
+                    
+                    header_idx = -1
+                    headers = []
+                    for idx, r in enumerate(rows[:6]):
+                        r_clean = [str(c).strip().lower() if c is not None else '' for c in r]
+                        if any(w in c for c in r_clean for w in ['pedido', 'id', 'motorista', 'rota', 'valor', 'data']):
+                            header_idx = idx
+                            headers = [str(c).strip() if c is not None else '' for c in r]
+                            break
+                    if header_idx == -1: continue
+                    
+                    for r in rows[header_idx+1:]:
+                        if not any(r): continue
+                        d_row = {headers[i]: r[i] for i in range(min(len(headers), len(r)))}
+                        
+                        pid = None
+                        for k, v in d_row.items():
+                            k_lower = k.lower()
+                            if ('pedido' in k_lower or 'id' in k_lower) and v is not None and str(v).strip() != '':
+                                pid = str(v).strip().split('.')[0]
+                                break
+                                
+                        if not pid or not pid.isdigit() or len(pid) < 5: continue
+                        total_lidos += 1
+                        
+                        dt_rec = ''
+                        dt_carr = ''
+                        motorista = ''
+                        regional = ''
+                        rota = ''
+                        placa = ''
+                        valor = ''
+                        operacao = ''
+                        motivo = ''
+                        
+                        for k, v in d_row.items():
+                            if v is None: continue
+                            k_lower = str(k).lower().strip()
+                            v_str = str(v).strip()
+                            if isinstance(v, datetime.datetime):
+                                v_str = v.strftime('%d/%m/%Y')
+                                
+                            if 'reclam' in k_lower or 'solicit' in k_lower: dt_rec = v_str
+                            elif 'carreg' in k_lower: dt_carr = v_str
+                            elif 'motorista' in k_lower or 'driver' in k_lower: motorista = v_str
+                            elif 'regional' in k_lower or 'filial' in k_lower: regional = v_str
+                            elif 'rota' in k_lower: rota = v_str
+                            elif 'placa' in k_lower: placa = v_str
+                            elif 'valor' in k_lower or 'perda' in k_lower: valor = v_str
+                            elif 'opera' in k_lower or 'cliente' in k_lower or 'conta' in k_lower: operacao = v_str
+                            elif 'motivo' in k_lower: motivo = v_str
+
+                        # Regra 1: Filtro de Operação (Manter apenas PETLOVE - LAST MILE)
+                        if operacao:
+                            op_clean = operacao.upper()
+                            if "PETLOVE" not in op_clean:
+                                continue
+
+                        # Regra 2: Filtro de Motivo (Desconsiderar DIF FRETE, GR, MANUTENÇÃO)
+                        if motivo:
+                            mot_clean = motivo.upper()
+                            motivos_excluidos = ["DIF FRETE", "DIFERENÇA DE FRETE", "DIF. FRETE", "GR", "MANUTENÇÃO", "MANUTENCAO"]
+                            if any(m in mot_clean for m in motivos_excluidos):
+                                continue
+
+                        cursor.execute('''
+                            INSERT INTO descontos (pedido_id, data_reclamacao, data_carregamento, motorista, regional, rota, placa, valor_desconto, origem_arquivo, data_importacao, operacao, motivo)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(pedido_id) DO UPDATE SET
+                                data_reclamacao = coalesce(nullif(excluded.data_reclamacao, ''), descontos.data_reclamacao),
+                                data_carregamento = coalesce(nullif(excluded.data_carregamento, ''), descontos.data_carregamento),
+                                motorista = coalesce(nullif(excluded.motorista, ''), descontos.motorista),
+                                regional = coalesce(nullif(excluded.regional, ''), descontos.regional),
+                                rota = coalesce(nullif(excluded.rota, ''), descontos.rota),
+                                placa = coalesce(nullif(excluded.placa, ''), descontos.placa),
+                                valor_desconto = coalesce(nullif(excluded.valor_desconto, ''), descontos.valor_desconto),
+                                origem_arquivo = excluded.origem_arquivo,
+                                data_importacao = excluded.data_importacao,
+                                operacao = coalesce(nullif(excluded.operacao, ''), descontos.operacao),
+                                motivo = coalesce(nullif(excluded.motivo, ''), descontos.motivo)
+                        ''', (pid, dt_rec, dt_carr, motorista, regional, rota, placa, valor, filename, now_str, operacao, motivo))
+                        total_importados += 1
+            except Exception as e:
+                print(f"Erro ao sincronizar arquivo de desconto {filename}: {e}")
+                
+        conn.commit()
+    conn.close()
+    return total_lidos, total_importados
+
+@app.get("/financeiro")
+@login_required
+def financeiro():
+    if not is_admin():
+        return render_template("login.html", erro="Acesso não autorizado. Apenas administradores podem acessar a área financeira."), 403
+    return render_template("financeiro.html", usuario=session.get('nome'), perfil=session.get('perfil'))
+
+@app.get("/api/financeiro/dados")
+@login_required
+def api_financeiro_dados():
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Se a tabela descontos estiver vazia, roda sincronização inicial de fundo
+        cursor.execute("SELECT COUNT(*) FROM descontos")
+        if cursor.fetchone()[0] == 0:
+            sincronizar_descontos_base()
+        
+        # 1. Casos que FORAM enviados para desconto (tabela descontos)
+        cursor.execute('''
+            SELECT 
+                d.pedido_id,
+                d.data_reclamacao,
+                d.data_carregamento,
+                d.motorista,
+                d.regional,
+                d.rota,
+                d.placa,
+                d.valor_desconto,
+                d.origem_arquivo,
+                d.data_importacao,
+                d.observacao,
+                d.operacao,
+                d.motivo,
+                c.Procedência,
+                c.Status_da_Tratativa,
+                c.Responsavel,
+                c.Justificativa,
+                c.Tratativa,
+                c.Criado_por,
+                c.Valor as valor_chamado,
+                'Enviado para Desconto' as status_envio
+            FROM descontos d
+            LEFT JOIN chamados c ON d.pedido_id = c.ID_do_Pedido
+            ORDER BY d.id DESC
+        ''')
+        rows_descontos = cursor.fetchall()
+        
+        # 2. Casos do fluxo de acareações que NÃO FORAM enviados para desconto
+        cursor.execute('''
+            SELECT 
+                c.ID_do_Pedido as pedido_id,
+                c.Descrição_da_Reclamação as data_reclamacao,
+                c.Data_do_Carregamento as data_carregamento,
+                c.Motorista as motorista,
+                c.Regional_2 as regional,
+                c.Rota as rota,
+                c.Placa_do_veículo as placa,
+                c.Valor as valor_desconto,
+                'Fluxo de Acareações (Sem Desconto)' as origem_arquivo,
+                '' as data_importacao,
+                '' as observacao,
+                'PETLOVE - LAST MILE' as operacao,
+                '' as motivo,
+                c.Procedência,
+                c.Status_da_Tratativa,
+                c.Responsavel,
+                c.Justificativa,
+                c.Tratativa,
+                c.Criado_por,
+                c.Valor as valor_chamado,
+                'Não Enviado' as status_envio
+            FROM chamados c
+            WHERE c.ID_do_Pedido NOT IN (SELECT pedido_id FROM descontos WHERE pedido_id IS NOT NULL AND pedido_id != '')
+            ORDER BY c.rowid DESC
+        ''')
+        rows_nao_enviados = cursor.fetchall()
+        
+        all_rows = list(rows_descontos) + list(rows_nao_enviados)
+        
+        items = []
+        periodos_dict = {}
+        
+        qtd_enviados = 0
+        valor_enviados = 0.0
+        qtd_nao_enviados = 0
+        valor_nao_enviados = 0.0
+        
+        qtd_com_chamado = 0
+        qtd_sem_chamado = 0
+        qtd_procedente = 0
+        valor_procedente = 0.0
+        qtd_nao_procedente = 0
+        valor_nao_procedente = 0.0
+        qtd_em_analise = 0
+        valor_em_analise = 0.0
+        
+        def parse_num(val_str):
+            if not val_str: return 0.0
+            try:
+                cln = str(val_str).replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+                return float(cln)
+            except:
+                return 0.0
+
+        def calc_quinzena(dt_str):
+            if not dt_str: return "", "", (0, 0, 0)
+            dt_str = str(dt_str).strip()
+            dt = None
+            for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d/%m/%y', '%Y/%m/%d'):
+                try:
+                    dt = datetime.datetime.strptime(dt_str[:10], fmt)
+                    break
+                except: pass
+            if not dt:
+                return "", "", (0, 0, 0)
+            
+            nomes_meses = {
+                1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+                5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+                9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+            }
+            m_name = nomes_meses.get(dt.month, str(dt.month))
+            key_month = f"{dt.year}-{dt.month:02d}"
+            
+            if dt.day <= 15:
+                q_code = f"{key_month}-Q1"
+                q_label = f"{m_name} Q1"
+                sort_key = (dt.year, dt.month, 1)
+            else:
+                q_code = f"{key_month}-Q2"
+                q_label = f"{m_name} Q2"
+                sort_key = (dt.year, dt.month, 2)
+                
+            return q_code, q_label, sort_key
+
+        for r in all_rows:
+            d = dict(r)
+            pid = str(d.get("pedido_id") or "").strip()
+            val_desc_raw = str(d.get("valor_desconto") or d.get("valor_chamado") or "").strip()
+            val_desc_num = parse_num(val_desc_raw)
+            status_envio = d.get("status_envio") or "Não Enviado"
+            
+            if status_envio == "Enviado para Desconto":
+                qtd_enviados += 1
+                valor_enviados += val_desc_num
+            else:
+                qtd_nao_enviados += 1
+                valor_nao_enviados += val_desc_num
+            
+            dt_ref = d.get("data_carregamento") or d.get("data_reclamacao") or ""
+            q_code, q_label, sort_key = calc_quinzena(dt_ref)
+            if q_code and q_code not in periodos_dict:
+                periodos_dict[q_code] = {"code": q_code, "label": q_label, "sort": sort_key}
+            
+            proc_raw = (d.get("Procedência") or "").strip()
+            status_trat = (d.get("Status_da_Tratativa") or "").strip()
+            resp = (d.get("Responsavel") or "").strip()
+            trat = (d.get("Tratativa") or "").strip()
+            
+            tem_chamado = d.get("Procedência") is not None or d.get("Status_da_Tratativa") is not None or d.get("Responsavel") is not None
+            
+            proc_norm = "Sem Chamado"
+            if tem_chamado:
+                qtd_com_chamado += 1
+                proc_lower = proc_raw.lower()
+                esta_fin = resp != "" or trat != "" or (proc_raw != "" and "analise" not in proc_lower and "análise" not in proc_lower)
+                
+                if proc_raw == "Procedente" or proc_lower == "procédente":
+                    proc_norm = "Procedente"
+                    qtd_procedente += 1
+                    valor_procedente += val_desc_num
+                elif proc_raw in ["Não Procedente", "Nao Procedente", "Improcedente"]:
+                    proc_norm = "Não Procedente"
+                    qtd_nao_procedente += 1
+                    valor_nao_procedente += val_desc_num
+                elif esta_fin:
+                    proc_norm = proc_raw if proc_raw else "Finalizado"
+                    qtd_procedente += 1
+                    valor_procedente += val_desc_num
+                else:
+                    proc_norm = "Em Análise"
+                    qtd_em_analise += 1
+                    valor_em_analise += val_desc_num
+            else:
+                qtd_sem_chamado += 1
+                
+            # Categoria de Confronto das 3 Bases (Fluxo Diário x TMSLOG x Financeiro)
+            if status_envio == "Enviado para Desconto":
+                if not tem_chamado:
+                    status_triangulacao = "Desconto sem Acareação"
+                    badge_triangulacao = "🔴 Desconto sem Chamado"
+                elif proc_norm == "Procedente":
+                    status_triangulacao = "Desconto Confirmado"
+                    badge_triangulacao = "🟢 Confirmado & Procedente"
+                elif proc_norm == "Não Procedente":
+                    status_triangulacao = "Cobrança Indevida / Contestada"
+                    badge_triangulacao = "🛡️ Contestado (Improcedente)"
+                else:
+                    status_triangulacao = "Desconto em Análise"
+                    badge_triangulacao = "⏳ Desconto em Análise"
+            else:
+                status_triangulacao = "Pendente de Desconto"
+                badge_triangulacao = "⚠️ Acareação Sem Desconto"
+                
+            items.append({
+                "pedido_id": pid,
+                "status_envio": status_envio,
+                "quinzena_code": q_code,
+                "quinzena_label": q_label,
+                "data_reclamacao": d.get("data_reclamacao") or "",
+                "data_carregamento": d.get("data_carregamento") or "",
+                "motorista": d.get("motorista") or "Não Informado",
+                "regional": d.get("regional") or "",
+                "rota": d.get("rota") or "",
+                "placa": d.get("placa") or "",
+                "valor_desconto": val_desc_raw,
+                "valor_desconto_num": val_desc_num,
+                "origem_arquivo": d.get("origem_arquivo") or "Fluxo de Acareações",
+                "data_importacao": d.get("data_importacao") or "",
+                "operacao": d.get("operacao") or "PETLOVE - LAST MILE",
+                "motivo": d.get("motivo") or "",
+                "status_triangulacao": status_triangulacao,
+                "badge_triangulacao": badge_triangulacao,
+                "tem_chamado": tem_chamado,
+                "status_chamado": status_trat or ("Em Andamento" if tem_chamado else "Não Cadastrado"),
+                "procedencia": proc_norm,
+                "responsavel": d.get("Responsavel") or "",
+                "justificativa": d.get("Justificativa") or "",
+                "tratativa": d.get("Tratativa") or "",
+                "criado_por": d.get("Criado_por") or ""
+            })
+            
+        periodos_list = sorted(list(periodos_dict.values()), key=lambda x: x["sort"], reverse=True)
+        
+        # Totais do confronto das 3 bases
+        val_desc_sem_chamado = sum(it["valor_desconto_num"] for it in items if it["status_triangulacao"] == "Desconto sem Acareação")
+        val_desc_confirmado = sum(it["valor_desconto_num"] for it in items if it["status_triangulacao"] == "Desconto Confirmado")
+        val_desc_contestavel = sum(it["valor_desconto_num"] for it in items if it["status_triangulacao"] == "Cobrança Indevida / Contestada")
+        val_pend_desconto = sum(it["valor_desconto_num"] for it in items if it["status_triangulacao"] == "Pendente de Desconto")
+        
+        resumo = {
+            "total_registros": len(items),
+            "valor_total": valor_enviados + valor_nao_enviados,
+            "qtd_enviados": qtd_enviados,
+            "valor_enviados": valor_enviados,
+            "qtd_nao_enviados": qtd_nao_enviados,
+            "valor_nao_enviados": valor_nao_enviados,
+            "qtd_com_chamado": qtd_com_chamado,
+            "qtd_sem_chamado": qtd_sem_chamado,
+            "qtd_procedente": qtd_procedente,
+            "valor_procedente": valor_procedente,
+            "qtd_nao_procedente": qtd_nao_procedente,
+            "valor_nao_procedente": valor_nao_procedente,
+            "qtd_em_analise": qtd_em_analise,
+            "valor_em_analise": valor_em_analise,
+            "qtd_desconto_sem_chamado": sum(1 for it in items if it["status_triangulacao"] == "Desconto sem Acareação"),
+            "valor_desconto_sem_chamado": val_desc_sem_chamado,
+            "qtd_desconto_confirmado": sum(1 for it in items if it["status_triangulacao"] == "Desconto Confirmado"),
+            "valor_desconto_confirmado": val_desc_confirmado,
+            "qtd_desconto_contestavel": sum(1 for it in items if it["status_triangulacao"] == "Cobrança Indevida / Contestada"),
+            "valor_desconto_contestavel": val_desc_contestavel,
+            "qtd_pendente_desconto": sum(1 for it in items if it["status_triangulacao"] == "Pendente de Desconto"),
+            "valor_pendente_desconto": val_pend_desconto
+        }
+        
+        return jsonify(registros=items, resumo=resumo, periodos=periodos_list)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/financeiro/sincronizar")
+@login_required
+def api_financeiro_sincronizar():
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
+    try:
+        lidos, importados = sincronizar_descontos_base()
+        return jsonify(sucesso=True, total_lidos=lidos, total_importados=importados)
+    except Exception as e:
+        return jsonify(erro=str(e)), 500
+
+@app.post("/api/financeiro/upload")
+@login_required
+def api_financeiro_upload():
+    if not is_admin():
+        return jsonify(erro="Acesso negado. Apenas administradores podem realizar esta ação."), 403
+    if 'arquivo' not in request.files:
+        return jsonify(erro="Nenhum arquivo enviado."), 400
+        
+    file = request.files['arquivo']
+    if file.filename == '':
+        return jsonify(erro="Nenhum arquivo selecionado."), 400
+        
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ['.xlsx', '.xls', '.csv']:
+        return jsonify(erro="Formato de arquivo inválido. Envie um arquivo Excel (.xlsx) ou CSV."), 400
+        
+    descontos_dir = BASE_DADOS_DIR.parent / "Descontos"
+    descontos_dir.mkdir(parents=True, exist_ok=True)
+    
+    destino = descontos_dir / file.filename
+    file.save(destino)
+    
+    try:
+        lidos, importados = sincronizar_descontos_base()
+        return jsonify(sucesso=True, mensagem=f"Arquivo '{file.filename}' importado com sucesso!", total_lidos=lidos, total_importados=importados)
+    except Exception as e:
+        return jsonify(erro=f"Erro ao processar planilha: {str(e)}"), 500
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False)

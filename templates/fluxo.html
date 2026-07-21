@@ -8,7 +8,7 @@
     :root{color-scheme:light;--bg:#f4f6f9;--card:#ffffff;--line:#e2e8f0;--text:#2d3748;--muted:#718096;--accent:#5e2a84;--secondary:#ef4154;}
     *{box-sizing:border-box} body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.5 'Inter',system-ui,sans-serif;}
     main{width:min(1300px,94%);margin:30px auto;}
-    .nav { display: flex; gap: 15px; margin-bottom: 20px; }
+    .nav { position: sticky; top: 0; z-index: 1000; background: var(--bg); padding: 12px 0; margin-bottom: 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 15px; }
     .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
     .nav a:hover { background: var(--line); }
     .nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -46,11 +46,10 @@
       <a href="/nova-acareacao">Nova Acareação</a>
       <a href="/gestao">Gestão de Solicitações</a>
       <a href="/dashboard">Dashboard Gerencial</a>
-      {% if session.usuario == 'admin@jm.com' %}
+      {% if is_admin %}
+      <a href="/financeiro">Financeiro</a>
       <a href="/usuarios">Usuários</a>
       <a href="/inconsistencias">Inconsistências</a>
-      {% endif %}
-      {% if session.perfil == 'Admin' %}
       <a href="/apresentacao">Apresentação</a>
       {% endif %}
     </div>
@@ -80,8 +79,11 @@
   
   <section id="area-detalhes" class="card hidden">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top:0; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-      <h2 style="margin: 0; color: var(--accent);">Detalhes da Solicitação</h2>
-      {% if session.usuario == 'admin@jm.com' %}
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <h2 style="margin: 0; color: var(--accent);">Detalhes da Solicitação</h2>
+        <button id="btn-modificar-caso" type="button" class="hidden" style="padding: 6px 12px; font-size: 13px; border-radius: 6px; background: var(--accent); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: bold; height: 32px;">✏️ Modificar</button>
+      </div>
+      {% if session.perfil == 'Admin' or session.usuario == 'admin@jm.com' %}
       <div style="display: flex; gap: 8px;">
         <button id="btn-editar-admin" type="button" style="padding: 6px 12px; font-size: 13px; border-radius: 6px;">✏️ Editar Campos</button>
         <button id="btn-salvar-admin" type="button" class="hidden" style="padding: 6px 12px; font-size: 13px; border-radius: 6px; background: #38a169;">💾 Salvar</button>
@@ -94,15 +96,7 @@
     <div class="details-grid">
       <div class="detail-item">
         <span class="detail-label">Nº Romaneio (Lista)</span>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span class="detail-value" id="det-romaneio" style="color:var(--accent); font-weight:800;">-</span>
-          <button id="btn-edit-romaneio" style="background:none; border:none; padding:4px; cursor:pointer; color:var(--accent); display:inline-flex; align-items:center; font-size:16px;" title="Editar Romaneio">✏️</button>
-        </div>
-        <div id="container-edit-romaneio" class="hidden" style="margin-top:5px; display:flex; gap:6px; align-items:center;">
-          <input type="text" id="input-romaneio" style="padding:6px 10px; font-size:13px; border-radius:6px; width:120px;">
-          <button id="btn-save-romaneio" style="padding:6px 12px; font-size:12px; border-radius:6px; background:#38a169; color:#fff;" type="button">Salvar</button>
-          <button id="btn-cancel-romaneio" style="padding:6px 12px; font-size:12px; border-radius:6px; background:#e2e8f0; color:#4a5568;" type="button">Cancelar</button>
-        </div>
+        <span class="detail-value" id="det-romaneio" style="color:var(--accent); font-weight:800;">-</span>
       </div>
       <div class="detail-item"><span class="detail-label">Responsável Inicial</span><span class="detail-value" id="det-resp">-</span></div>
       <div class="detail-item"><span class="detail-label">Data da Rota</span><span class="detail-value" id="det-data-rota">-</span></div>
@@ -112,16 +106,53 @@
       <div class="detail-item"><span class="detail-label">Rota</span><span class="detail-value" id="det-rota">-</span></div>
       <div class="detail-item"><span class="detail-label">Regional</span><span class="detail-value" id="det-reg">-</span></div>
       <div class="detail-item"><span class="detail-label">Valor (R$)</span><span class="detail-value" id="det-valor" style="font-weight:900; color:var(--accent);">-</span></div>
-      <div class="detail-item"><span class="detail-label">Status da Tratativa</span><span class="detail-value" id="det-status-tratativa" style="font-weight:900;">-</span></div>
+      
+      <div class="detail-item">
+        <span class="detail-label">Status da Tratativa</span>
+        <span class="detail-value" id="det-status-tratativa" style="font-weight:900; display:block;">-</span>
+        <div id="container-edit-status" class="hidden" style="margin-top:5px;">
+          <select id="input-status" style="padding:6px 10px; font-size:13px; border-radius:6px; width:150px;">
+            <option value="Em Andamento">Em Andamento</option>
+            <option value="Finalizado">Finalizado</option>
+          </select>
+        </div>
+      </div>
+      
       <div class="detail-item"><span class="detail-label">Nome do Cliente</span><span class="detail-value" id="det-cliente">-</span></div>
+      
+      <div class="detail-item">
+        <span class="detail-label">Procedência</span>
+        <span class="detail-value" id="det-procedencia" style="font-weight:800; display:block;">-</span>
+        <div id="container-edit-procedencia" class="hidden" style="margin-top:5px;">
+          <select id="input-procedencia" style="padding:6px 10px; font-size:13px; border-radius:6px; width:150px;">
+            <option value="">Selecione...</option>
+            <option value="Procedente">Procedente</option>
+            <option value="Não Procedente">Não Procedente</option>
+            <option value="Em Análise">Em Análise</option>
+          </select>
+        </div>
+      </div>
+      
       <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Endereço do Cliente</span><span class="detail-value" id="det-endereco">-</span></div>
       <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Descrição da Divergência</span><span class="detail-value" id="det-divergencia" style="white-space: pre-wrap;">-</span></div>
-      <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">Justificativa</span><span class="detail-value" id="det-justificativa" style="white-space: pre-wrap;">-</span></div>
+      
+      <div class="detail-item" style="grid-column: 1 / -1;">
+        <span class="detail-label">Justificativa</span>
+        <span class="detail-value" id="det-justificativa" style="white-space: pre-wrap; display:block;">-</span>
+        <div id="container-edit-justificativa" class="hidden" style="margin-top:5px;">
+          <textarea id="input-justificativa" rows="3" style="padding:8px 12px; font-size:13px; border-radius:6px; width:100%; border:2px solid var(--line); font-family:inherit;"></textarea>
+        </div>
+      </div>
+
+      <div class="detail-item" style="grid-column: 1 / -1;" id="item-det-tratativa">
+        <span class="detail-label">Tratativa Final</span>
+        <span class="detail-value" id="det-tratativa" style="white-space: pre-wrap;">-</span>
+      </div>
     </div>
     
     <div class="form-update">
-      <label class="full-width">Tratativa da Solicitação<textarea id="tratativa" rows="3" placeholder="Qual foi a tratativa final..."></textarea></label>
-      <label>Qual foi a Procedência?
+      <label class="full-width" id="label-tratativa-update">Tratativa da Solicitação<textarea id="tratativa" rows="3" placeholder="Qual foi a tratativa final..."></textarea></label>
+      <label id="label-procedencia-update">Qual foi a Procedência?
         <select id="procedencia">
           <option value="">Selecione...</option>
           <option value="Procedente">Procedente</option>
@@ -149,14 +180,6 @@ const $ = s => document.querySelector(s);
 const usuarioLogado = "{{ session.usuario }}";
 let pedidoAtual = '';
 
-window.addEventListener('DOMContentLoaded', () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const pedidoParam = urlParams.get('pedido');
-  if (pedidoParam) {
-    $('#pedido').value = pedidoParam;
-    $('#form-busca').dispatchEvent(new Event('submit'));
-  }
-});
 
 $('#form-busca').addEventListener('submit', async event => {
   event.preventDefault(); 
@@ -168,7 +191,15 @@ $('#form-busca').addEventListener('submit', async event => {
   $('#status-atualizar').textContent = '';
   
   try {
-    const response = await fetch(`/api/fluxo/buscar/${pedido}`);
+    const response = await fetch(`/api/fluxo/buscar/${pedido}?_=${Date.now()}`);
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("text/html")) {
+      if (response.url && response.url.includes("/login")) {
+        window.location.href = "/login?proxima=" + encodeURIComponent(window.location.pathname + window.location.search);
+        return;
+      }
+      throw new Error("Sessão expirada ou erro no servidor. Por favor, atualize a página.");
+    }
     const data = await response.json();
     if (!response.ok) throw new Error(data.erro || 'Falha ao buscar o pedido.');
     
@@ -176,9 +207,20 @@ $('#form-busca').addEventListener('submit', async event => {
     $('#det-romaneio').textContent = data['Lista_Entrega_Cruzada'] || '-';
     
     // Fechar formulário de edição se estiver aberto
-    $('#container-edit-romaneio').classList.add('hidden');
-    $('#btn-edit-romaneio').style.display = 'inline-flex';
-    $('#det-romaneio').style.display = 'inline';
+    const cStatus = $('#container-edit-status');
+    const dStatus = $('#det-status-tratativa');
+    if (cStatus) cStatus.classList.add('hidden');
+    if (dStatus) dStatus.style.display = 'inline';
+
+    const cProc = $('#container-edit-procedencia');
+    const dProc = $('#det-procedencia');
+    if (cProc) cProc.classList.add('hidden');
+    if (dProc) dProc.style.display = 'inline';
+
+    const cJust = $('#container-edit-justificativa');
+    const dJust = $('#det-justificativa');
+    if (cJust) cJust.classList.add('hidden');
+    if (dJust) dJust.style.display = 'inline';
 
     // Renderizar o histórico
     const histLista = $('#lista-historico');
@@ -212,6 +254,8 @@ $('#form-busca').addEventListener('submit', async event => {
     $('#det-endereco').textContent = (data['Endereco_do_cliente'] || data['Endereco do cliente']) || '-';
     $('#det-divergencia').textContent = data['Descrição da Divergência'] || '-';
     $('#det-justificativa').textContent = data['Justificativa'] || '-';
+    $('#det-procedencia').textContent = data['Procedência'] || '-';
+    $('#det-tratativa').textContent = data['Tratativa'] || '-';
     
     const statusTrat = data['Status da Tratativa'] || 'Em Andamento';
     $('#det-status-tratativa').textContent = statusTrat;
@@ -247,21 +291,57 @@ $('#form-busca').addEventListener('submit', async event => {
       selectProc.value = procValue;
     }
     
-    // Se já estiver analisado, bloqueia a tela, EXCETO para o admin@jm.com
-    if (data['Responsavel'] && data['Responsavel'].trim() !== '' && usuarioLogado !== 'admin@jm.com') {
-        $('#tratativa').disabled = true;
-        $('#procedencia').disabled = true;
-        $('#btn-atualizar').disabled = true;
-        $('#btn-atualizar').style.cursor = 'not-allowed';
-        $('#btn-atualizar').style.background = '#999';
-        status.textContent = 'Este chamado já foi analisado por ' + data['Responsavel'] + ' e não pode ser alterado.';
-        status.className = 'sucesso'; // mostra texto verde/azul em vez de erro
+    // Se já estiver finalizado, esconde a tela de preenchimento inicial e apenas exibe a visualização
+    const pencilRomaneio = $('#btn-edit-romaneio');
+    const pencilStatus = $('#btn-edit-status');
+    const pencilProcedencia = $('#btn-edit-procedencia');
+    const pencilJustificativa = $('#btn-edit-justificativa');
+    const pencilTratativa = $('#btn-edit-tratativa');
+
+    const labelTratativa = $('#label-tratativa-update');
+    const labelProcedencia = $('#label-procedencia-update');
+    const formUpdate = $('.form-update');
+    const btnModificar = $('#btn-modificar-caso');
+
+    // Resetar campos de edição inline para o modo de leitura
+    $('#container-edit-status').classList.add('hidden');
+    $('#det-status-tratativa').style.display = 'inline';
+    $('#container-edit-procedencia').classList.add('hidden');
+    $('#det-procedencia').style.display = 'inline';
+    $('#container-edit-justificativa').classList.add('hidden');
+    $('#det-justificativa').style.display = 'inline';
+
+    if (statusTrat === 'Finalizado') {
+        // Mostrar o botão unificado de Modificar
+        if (btnModificar) {
+            btnModificar.classList.remove('hidden');
+            btnModificar.textContent = '✏️ Modificar';
+            btnModificar.style.background = 'var(--accent)';
+        }
+        
+        // Esconder o formulário de rodapé por padrão até que cliquem em Modificar
+        if (formUpdate) formUpdate.classList.add('hidden');
+        if (labelTratativa) labelTratativa.classList.add('hidden');
+        if (labelProcedencia) labelProcedencia.classList.add('hidden');
+        
+        const respText = data['Responsavel'] ? ' por ' + data['Responsavel'] : '';
+        status.textContent = 'Esta solicitação está finalizada' + respText + '.';
+        status.className = 'sucesso'; // mostra texto verde/azul
     } else {
+        // Esconder o botão de Modificar
+        if (btnModificar) btnModificar.classList.add('hidden');
+        
+        // Mostrar o formulário de rodapé completo
+        if (formUpdate) formUpdate.classList.remove('hidden');
+        if (labelTratativa) labelTratativa.classList.remove('hidden');
+        if (labelProcedencia) labelProcedencia.classList.remove('hidden');
+        
         $('#tratativa').disabled = false;
         $('#procedencia').disabled = false;
         $('#btn-atualizar').disabled = false;
         $('#btn-atualizar').style.cursor = 'pointer';
         $('#btn-atualizar').style.background = 'var(--accent)';
+        
         status.textContent = '';
     }
     
@@ -273,20 +353,49 @@ $('#form-busca').addEventListener('submit', async event => {
   }
 });
 
+// Executar busca inicial caso o ID do pedido esteja na URL
+const urlParams = new URLSearchParams(window.location.search);
+const pedidoParam = urlParams.get('pedido');
+if (pedidoParam) {
+  $('#pedido').value = pedidoParam;
+  const formBusca = $('#form-busca');
+  if (formBusca) {
+    formBusca.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  }
+}
+
 $('#btn-atualizar').addEventListener('click', async () => {
   const btn = $('#btn-atualizar'), status = $('#status-atualizar');
   btn.disabled = true; status.className = ''; status.textContent = 'Salvando atualizações...';
   
   try {
     const dadosOrig = window._dadosOriginais || {};
+    
+    // Pegar o valor da justificativa (seja da edição inline ou o original)
+    let justificativa = dadosOrig['Justificativa'] || '';
+    const inputJust = $('#input-justificativa');
+    const containerJust = $('#container-edit-justificativa');
+    if (containerJust && !containerJust.classList.contains('hidden') && inputJust) {
+      justificativa = inputJust.value.trim();
+    }
+    
+    // Pegar o valor da tratativa (seja da edição inline ou do formulário principal)
+    let tratativa = $('#tratativa').value;
+    const inputTrat = $('#input-tratativa');
+    const containerTrat = $('#container-edit-tratativa');
+    if (containerTrat && !containerTrat.classList.contains('hidden') && inputTrat) {
+      tratativa = inputTrat.value.trim();
+    }
+    
     const payload = {
       pedido: pedidoAtual,
       responsavel: "{{ usuario }}",
-      justificativa: dadosOrig['Justificativa'] || '',
+      justificativa: justificativa,
       divergencia: dadosOrig['Descrição da Divergência'] || '',
-      tratativa: $('#tratativa').value,
+      tratativa: tratativa,
       valor: dadosOrig['Valor'] || '',
-      procedencia: $('#procedencia').value
+      procedencia: $('#procedencia').value,
+      status: $('#det-status-tratativa').textContent.trim()
     };
     
     const response = await fetch('/api/fluxo/atualizar', {
@@ -299,8 +408,15 @@ $('#btn-atualizar').addEventListener('click', async () => {
     if (!response.ok) throw new Error(data.erro || 'Falha ao atualizar.');
     
     status.className = 'sucesso';
-    status.textContent = 'Redirecionando...';
-    setTimeout(() => { window.location.href = '/gestao?salvo=1'; }, 500);
+    
+    const statusTratAtual = $('#det-status-tratativa').textContent.trim();
+    if (statusTratAtual === 'Finalizado') {
+        status.textContent = 'Atualizado com sucesso!';
+        $('#form-busca').dispatchEvent(new Event('submit'));
+    } else {
+        status.textContent = 'Redirecionando...';
+        setTimeout(() => { window.location.href = '/gestao?salvo=1'; }, 500);
+    }
   } catch (error) {
     status.className = 'erro'; status.textContent = error.message;
   } finally {
@@ -308,64 +424,79 @@ $('#btn-atualizar').addEventListener('click', async () => {
   }
 });
 
-// Lógica de Edição do Romaneio Inline
-const btnEditRomaneio = $('#btn-edit-romaneio');
-const containerEditRomaneio = $('#container-edit-romaneio');
-const inputRomaneio = $('#input-romaneio');
-const btnSaveRomaneio = $('#btn-save-romaneio');
-const btnCancelRomaneio = $('#btn-cancel-romaneio');
-const detRomaneio = $('#det-romaneio');
-
-if (btnEditRomaneio) {
-  btnEditRomaneio.addEventListener('click', () => {
-    const valAtual = detRomaneio.textContent.trim();
-    inputRomaneio.value = (valAtual === '-' || valAtual === 'Erro' || valAtual === 'Não encontrada') ? '' : valAtual;
+// Lógica de Edição Inline Unificada (Botão Modificar Único)
+const btnModificarCaso = $('#btn-modificar-caso');
+if (btnModificarCaso) {
+  btnModificarCaso.addEventListener('click', () => {
+    const isEditing = !$('#container-edit-status').classList.contains('hidden');
     
-    btnEditRomaneio.style.display = 'none';
-    detRomaneio.style.display = 'none';
-    containerEditRomaneio.classList.remove('hidden');
-    inputRomaneio.focus();
-  });
-}
-
-if (btnCancelRomaneio) {
-  btnCancelRomaneio.addEventListener('click', () => {
-    containerEditRomaneio.classList.add('hidden');
-    btnEditRomaneio.style.display = 'inline-flex';
-    detRomaneio.style.display = 'inline';
-  });
-}
-
-if (btnSaveRomaneio) {
-  btnSaveRomaneio.addEventListener('click', async () => {
-    const novoVal = inputRomaneio.value.trim();
-    btnSaveRomaneio.disabled = true;
-    btnCancelRomaneio.disabled = true;
+    const containerStatus = $('#container-edit-status');
+    const detStatus = $('#det-status-tratativa');
+    const inputStatus = $('#input-status');
     
-    try {
-      const response = await fetch('/api/fluxo/atualizar_romaneio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pedido: pedidoAtual, romaneio: novoVal })
-      });
+    const containerProc = $('#container-edit-procedencia');
+    const detProc = $('#det-procedencia');
+    const inputProc = $('#input-procedencia');
+    
+    const containerJust = $('#container-edit-justificativa');
+    const detJust = $('#det-justificativa');
+    const inputJust = $('#input-justificativa');
+    
+    const formUpdate = $('.form-update');
+    
+    if (isEditing) {
+      // Cancelar / Fechar Modo de Edição
+      btnModificarCaso.textContent = '✏️ Modificar';
+      btnModificarCaso.style.background = 'var(--accent)';
       
-      const resData = await response.json();
-      if (!response.ok) throw new Error(resData.erro || 'Falha ao salvar romaneio.');
+      containerStatus.classList.add('hidden');
+      detStatus.style.display = 'inline';
       
-      detRomaneio.textContent = novoVal || '-';
+      containerProc.classList.add('hidden');
+      detProc.style.display = 'inline';
       
-      containerEditRomaneio.classList.add('hidden');
-      btnEditRomaneio.style.display = 'inline-flex';
-      detRomaneio.style.display = 'inline';
+      containerJust.classList.add('hidden');
+      detJust.style.display = 'inline';
       
-      // Recarregar os detalhes para atualizar o histórico na tela
-      $('#form-busca').dispatchEvent(new Event('submit'));
+      if (formUpdate) formUpdate.classList.add('hidden');
+    } else {
+      // Entrar no Modo de Edição
+      btnModificarCaso.textContent = 'Cancelar Modificação';
+      btnModificarCaso.style.background = '#e53e3e'; // vermelho para cancelar
       
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      btnSaveRomaneio.disabled = false;
-      btnCancelRomaneio.disabled = false;
+      // Status
+      const statusVal = detStatus.textContent.trim();
+      inputStatus.value = (statusVal === 'Finalizado' || statusVal === 'Em Andamento') ? statusVal : 'Finalizado';
+      detStatus.style.display = 'none';
+      containerStatus.classList.remove('hidden');
+      
+      // Procedência
+      const procVal = detProc.textContent.trim();
+      inputProc.value = (procVal === '-' || procVal === 'Selecione...') ? '' : procVal;
+      detProc.style.display = 'none';
+      containerProc.classList.remove('hidden');
+      
+      // Justificativa
+      const justVal = detJust.textContent.trim();
+      inputJust.value = justVal === '-' ? '' : justVal;
+      detJust.style.display = 'none';
+      containerJust.classList.remove('hidden');
+      
+      // Mostrar o botão "Salvar e Atualizar" no rodapé do formulário
+      if (formUpdate) {
+        formUpdate.classList.remove('hidden');
+        // Esconder os inputs normais do rodapé (Tratativa/Procedência)
+        const labelTratativa = $('#label-tratativa-update');
+        const labelProcedencia = $('#label-procedencia-update');
+        if (labelTratativa) labelTratativa.classList.add('hidden');
+        if (labelProcedencia) labelProcedencia.classList.add('hidden');
+        
+        $('#btn-atualizar').disabled = false;
+        $('#btn-atualizar').style.cursor = 'pointer';
+        $('#btn-atualizar').style.background = 'var(--accent)';
+      }
+      
+      inputJust.focus();
     }
   });
 }

@@ -31,8 +31,7 @@
       margin: 30px auto;
     }
     
-    /* Nav */
-    .nav { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; justify-content: space-between; }
+    .nav { position: sticky; top: 0; z-index: 1000; background: var(--bg); padding: 12px 0; margin-bottom: 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 15px; }
     .nav-links { display:flex; gap:15px; }
     .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
     .nav a:hover { background: var(--line); }
@@ -50,10 +49,10 @@
     .header-tabela h2 { margin: 0; font-size: 18px; color: var(--accent); font-weight: 800; }
     
     /* Table */
-    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+    .table-wrap { overflow: auto; max-height: 65vh; border: 1px solid var(--line); border-radius: 12px; }
     table { width: 100%; border-collapse: collapse; background: var(--card); }
     th, td { padding: 14px 18px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
-    th { background: #f8f9fa; font-weight: 700; color: var(--accent); }
+    th { position: sticky; top: 0; background: #f8f9fa; font-weight: 700; color: var(--accent); z-index: 2; }
     tr:hover td { background: rgba(94, 42, 132, 0.02); }
     
     /* Badges */
@@ -110,11 +109,10 @@
         <a href="/nova-acareacao">Nova Acareação</a>
         <a href="/gestao">Gestão de Solicitações</a>
         <a href="/dashboard">Dashboard</a>
-        {% if session.usuario == 'admin@jm.com' %}
+        {% if is_admin %}
+        <a href="/financeiro">Financeiro</a>
         <a href="/usuarios" class="active">Usuários</a>
         <a href="/inconsistencias">Inconsistências</a>
-        {% endif %}
-        {% if session.perfil == 'Admin' %}
         <a href="/apresentacao">Apresentação</a>
         {% endif %}
       </div>
@@ -137,11 +135,13 @@
 
     <!-- Card Principal -->
     <section class="card">
-      <div class="header-tabela">
-        <h2>Usuários do Sistema</h2>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <h2 style="margin:0;">Usuários do Sistema</h2>
+          <span id="user-count-badge" class="badge badge-admin" style="font-size:12px; font-weight:800;"></span>
+        </div>
         <div style="display:flex; gap:10px;">
-          <button class="btn btn-primary" onclick="sincronizarTMS(this)">🔄 Carregar TMS (Manual)</button>
-          <button class="btn btn-success" onclick="abrirModalNovo()">➕ Novo Usuário</button>
+          <button class="btn btn-primary" onclick="sincronizarTMS(this)">Carregar TMS (Manual)</button>
+          <button class="btn btn-success" onclick="abrirModalNovo()">+ Novo Usuário</button>
         </div>
       </div>
 
@@ -205,8 +205,10 @@
   </div>
 
   <script>
-    let usuariosCadastrados = [];
-    const loggedUserEmail = "{{ session.get('usuario') }}";
+    const loggedUserEmail = "{{ session.usuario }}".toLowerCase();
+    const eyeOpenSVG = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 15px; height: 15px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>`;
+
+    const eyeClosedSVG = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 15px; height: 15px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>`;
 
     async function sincronizarTMS(btn) {
       if (!confirm("Deseja iniciar a importação manual dos relatórios da pasta Relatorio TMS?")) {
@@ -215,7 +217,7 @@
       
       const originalText = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = "🔄 Importando dados...";
+      btn.innerHTML = "Importando dados...";
       
       try {
         const response = await fetch('/api/tms/sincronizar', { method: 'POST' });
@@ -223,10 +225,10 @@
         
         if (!response.ok) throw new Error(data.erro || 'Falha na sincronização.');
         
-        showToast(`✅ Sincronização concluída! ${data.total_novos} novos registros importados (${data.total_lidos} lidos).`);
+        showToast(`Sincronização concluída! ${data.total_novos} novos registros importados (${data.total_lidos} lidos).`);
         
       } catch (err) {
-        showToast(`❌ Erro ao sincronizar: ${err.message}`, true);
+        showToast(`Erro ao sincronizar: ${err.message}`, true);
       } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
@@ -246,36 +248,58 @@
       tbody.innerHTML = '';
       
       try {
-        const response = await fetch('/api/usuarios');
-        const data = await response.json();
+        const response = await fetch(`/api/usuarios?_=${Date.now()}`);
+        const contentType = response.headers.get("content-type") || "";
         
-        if (!response.ok) throw new Error(data.erro || 'Falha ao buscar usuários.');
+        if (contentType.includes("text/html") || response.status === 401) {
+          window.location.href = "/login?proxima=" + encodeURIComponent(window.location.pathname + window.location.search);
+          return;
+        }
+
+        const data = await response.json().catch(() => null);
+
+        if (data && data.redirecionar) {
+          window.location.href = data.redirecionar;
+          return;
+        }
+
+        if (!response.ok || !data) {
+          throw new Error((data && data.erro) || `Erro (${response.status}): Acesso não autorizado ou falha na requisição.`);
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error('Formato de dados de usuários inválido recebido do servidor.');
+        }
         
         usuariosCadastrados = data;
+        const badgeElem = document.getElementById('user-count-badge');
+        if (badgeElem) badgeElem.textContent = `${data.length} cadastrados`;
         
         data.forEach(user => {
           const tr = document.createElement('tr');
           const badgeClass = user.Perfil === 'Admin' ? 'badge-admin' : 'badge-usuario';
+          const emailSafe = escapeHtml(user.Email);
+          const emailAttr = escapeJsString(user.Email);
           
           let botoesAcao = `
-            <button class="btn btn-primary btn-small" onclick="abrirModalEditar('${user.Email}')">✏️ Editar</button>
-            <button class="btn btn-danger btn-small" onclick="deletarUsuario('${user.Email}')">🗑️ Excluir</button>
+            <button class="btn btn-primary btn-small" onclick="abrirModalEditar('${emailAttr}')">Editar</button>
+            <button class="btn btn-danger btn-small" onclick="deletarUsuario('${emailAttr}')">Excluir</button>
           `;
           
-          if (user.Email === loggedUserEmail) {
+          if (String(user.Email || '').toLowerCase() === loggedUserEmail) {
             botoesAcao = `
-              <button class="btn btn-primary btn-small" onclick="abrirModalEditar('${user.Email}')">✏️ Editar</button>
+              <button class="btn btn-primary btn-small" onclick="abrirModalEditar('${emailAttr}')">Editar</button>
               <span style="font-size:11px; color:var(--muted); font-weight:bold;">Sua Conta (Ativa)</span>
             `;
           }
           
           tr.innerHTML = `
             <td style="font-weight:bold; color:var(--text);">${escapeHtml(user.Nome)}</td>
-            <td>${escapeHtml(user.Email)}</td>
+            <td>${emailSafe}</td>
             <td><span class="badge ${badgeClass}">${user.Perfil}</span></td>
             <td>
-              <span class="pwd-text" data-password="${escapeHtml(user.Senha)}" style="font-family:monospace; font-size:14px; letter-spacing:2px; font-weight:bold; color:var(--text);">••••••</span>
-              <button class="btn btn-secondary btn-small" onclick="toggleRowPassword(this)" style="padding:2px 6px; font-size:11px; margin-left:8px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:4px; height:24px; vertical-align:middle; cursor:pointer;" title="Mostrar/Ocultar Senha">👁️</button>
+              <span class="pwd-text" data-email="${emailSafe}" data-hidden="true" style="font-family:monospace; font-size:14px; letter-spacing:2px; font-weight:bold; color:var(--text);">••••••</span>
+              <button class="btn btn-secondary btn-small" onclick="toggleRowPassword(this, '${emailAttr}')" style="padding:2px 6px; font-size:11px; margin-left:8px; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:4px; height:24px; vertical-align:middle; cursor:pointer;" title="Mostrar/Ocultar Senha">${eyeOpenSVG}</button>
             </td>
             <td style="text-align:center; display:flex; gap:10px; justify-content:center; align-items:center;">
               ${botoesAcao}
@@ -307,32 +331,32 @@
       const input = document.getElementById(inputId);
       if (input.type === 'password') {
         input.type = 'text';
-        btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-          </svg>
-        `;
+        btn.innerHTML = eyeClosedSVG;
       } else {
         input.type = 'password';
-        btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        `;
+        btn.innerHTML = eyeOpenSVG;
       }
     }
 
-    function toggleRowPassword(btn) {
+    function escapeJsString(str) {
+      if (!str) return '';
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    function toggleRowPassword(btn, email) {
       const span = btn.previousElementSibling;
-      const pwd = span.getAttribute('data-password');
-      if (span.textContent === '••••••') {
+      const user = usuariosCadastrados.find(u => String(u.Email).toLowerCase() === String(email).toLowerCase());
+      const pwd = (user && user.Senha && String(user.Senha).trim()) ? user.Senha : '(Sem senha cadastrada)';
+      
+      if (span.dataset.hidden !== 'false') {
         span.textContent = pwd;
-        btn.textContent = '🔒';
+        span.dataset.hidden = 'false';
+        btn.innerHTML = eyeClosedSVG;
         btn.title = "Ocultar Senha";
       } else {
         span.textContent = '••••••';
-        btn.textContent = '👁️';
+        span.dataset.hidden = 'true';
+        btn.innerHTML = eyeOpenSVG;
         btn.title = "Mostrar Senha";
       }
     }
@@ -352,7 +376,7 @@
     }
 
     function abrirModalEditar(email) {
-      const user = usuariosCadastrados.find(u => u.Email === email);
+      const user = usuariosCadastrados.find(u => String(u.Email).toLowerCase() === String(email).toLowerCase());
       if (!user) return;
       
       document.getElementById('modal-titulo').textContent = 'Editar Usuário';
@@ -360,10 +384,10 @@
       document.getElementById('user-email').disabled = true;
       document.getElementById('user-nome').value = user.Nome;
       document.getElementById('user-perfil').value = user.Perfil;
-      document.getElementById('user-senha').value = '';
+      document.getElementById('user-senha').value = user.Senha || '';
       document.getElementById('user-senha').required = false;
       document.getElementById('user-senha').placeholder = 'Digite para alterar a senha';
-      document.getElementById('senha-aviso').textContent = 'Deixe este campo em branco para manter a senha atual.';
+      document.getElementById('senha-aviso').textContent = 'Você pode visualizar ou alterar a senha atual acima.';
       
       document.getElementById('modal-usuario').classList.add('active');
     }

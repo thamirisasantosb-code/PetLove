@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Painel Gerencial Financeiro - Petlove JM</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --line: #e2e8f0;
+      --text: #2d3748;
+      --muted: #718096;
+      --accent: #5e2a84;
+      --secondary: #ef4154;
+      --success: #38a169;
+      --warning: #dd6b20;
+      --info: #3182ce;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 'Inter', system-ui, sans-serif;
+    }
+    main {
+      width: min(1450px, 96%);
+      margin: 30px auto;
+    }
+    
+    .nav { position: sticky; top: 0; z-index: 1000; background: var(--bg); padding: 12px 0; margin-bottom: 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+    .nav-links { display: flex; gap: 15px; }
+    .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
+    .nav a:hover { background: var(--line); }
+    .nav a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    
+    .corporate-header { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--line); padding: 25px 35px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(94, 42, 132, 0.06); flex-wrap: wrap; gap: 20px;}
+    .corporate-header .jm-logo { height: 60px; object-fit: contain; }
+    .title-area { text-align: right; }
+    .title-area h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent); }
+    .title-area p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 500;}
+    
+    /* Visões Gerenciais e Tabs */
+    .view-mode-tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 2px solid var(--line); padding-bottom: 12px; }
+    .tab-btn { padding: 12px 22px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-weight: 800; cursor: pointer; font-size: 14px; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+    .tab-btn:hover { background: #edf2f7; transform: translateY(-1px); }
+    .tab-btn.active { background: var(--accent); color: #ffffff; border-color: var(--accent); box-shadow: 0 4px 14px rgba(94, 42, 132, 0.25); }
+
+    .manager-views-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+    .view-title-label { font-weight: 800; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 5px; }
+    .view-btn { padding: 9px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); font-weight: 700; cursor: pointer; font-size: 13px; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.03); display: inline-flex; align-items: center; gap: 6px; }
+    .view-btn:hover { background: #edf2f7; transform: translateY(-1px); }
+    .view-btn.active { background: var(--accent); color: #ffffff; border-color: var(--accent); box-shadow: 0 4px 12px rgba(94, 42, 132, 0.25); }
+
+    /* Stat Cards Grid */
+    .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 25px; }
+    .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.04); display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 12px 35px rgba(94, 42, 132, 0.08); }
+    .stat-card.active-card { box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.35), 0 8px 30px rgba(94, 42, 132, 0.08); transform: translateY(-2px); }
+    .stat-card .label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-card .value { font-size: 25px; font-weight: 900; color: var(--accent); }
+    .stat-card .sub-value { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 4px; }
+    
+    .stat-card.total-card { border-left: 5px solid var(--accent); }
+    .stat-card.enviado-card { border-left: 5px solid #5e2a84; }
+    .stat-card.nao-enviado-card { border-left: 5px solid var(--warning); }
+    .stat-card.procedente-card { border-left: 5px solid var(--success); }
+    .stat-card.nao-procedente-card { border-left: 5px solid var(--secondary); }
+    .stat-card.analise-card { border-left: 5px solid var(--info); }
+
+    /* Visual Barometer & Executive Metrics */
+    .barometer-section { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px; }
+    .barometer-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.04); }
+    .barometer-card.full-width { grid-column: 1 / -1; }
+    .barometer-title { font-size: 16px; font-weight: 800; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .barometer-subtitle { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 18px; }
+
+    /* Custom Progress Bars */
+    .meter-container { margin-bottom: 16px; }
+    .meter-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .meter-bar-outer { height: 18px; background: #e2e8f0; border-radius: 10px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06); }
+    .meter-segment { height: 100%; transition: width 0.6s ease; }
+    .bg-accent { background: var(--accent); }
+    .bg-warning { background: var(--warning); }
+    .bg-success { background: var(--success); }
+    .bg-danger { background: var(--secondary); }
+    .bg-info { background: var(--info); }
+
+    /* Quinzena Cards Grid */
+    .quinzena-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+    .quinzena-box { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .quinzena-box-title { font-weight: 800; font-size: 14px; color: var(--accent); margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .quinzena-box-val { font-size: 20px; font-weight: 900; color: var(--text); }
+    .quinzena-box-sub { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+
+    /* Ranking Regional */
+    .regional-list { display: flex; flex-direction: column; gap: 12px; }
+    .regional-item { display: flex; flex-direction: column; gap: 4px; }
+    .regional-info { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; }
+
+    /* Executive Charts Grid */
+    .charts-container-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px; }
+    .chart-box { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.04); transition: transform 0.2s; }
+    .chart-box:hover { box-shadow: 0 12px 35px rgba(94, 42, 132, 0.07); }
+    .chart-box.full-width { grid-column: 1 / -1; }
+    .chart-header { margin-bottom: 18px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+    .chart-title { font-size: 15px; font-weight: 800; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+    .chart-subtitle { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+    .canvas-wrap { position: relative; width: 100%; min-height: 250px; }
+
+    @media (max-width: 1024px) {
+      .barometer-section, .charts-container-grid { grid-template-columns: 1fr; }
+      .barometer-card.full-width, .chart-box.full-width { grid-column: 1; }
+    }
+
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; box-shadow: 0 8px 30px rgba(94, 42, 132, 0.05); margin-bottom: 20px; }
+    
+    /* Control Toolbar */
+    .toolbar-actions { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+    .toolbar-actions h2 { margin: 0; font-size: 18px; color: var(--accent); font-weight: 800; }
+    .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    
+    /* Buttons */
+    .btn { border: 0; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-secondary { background: var(--line); color: var(--text); }
+    .btn-secondary:hover { background: #cbd5e0; }
+    .btn-small { padding: 6px 12px; border-radius: 6px; font-size: 12px; }
+    
+    /* Search Box & Filters Bar */
+    .search-row { display: flex; gap: 10px; width: 100%; margin-bottom: 15px; }
+    .search-row input { flex: 1; padding: 12px 16px; border: 2px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 600; outline: none; transition: 0.2s; }
+    .search-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15); }
+    .btn-search { background: var(--accent); color: white; padding: 12px 24px; border-radius: 10px; font-size: 14px; font-weight: 800; border: none; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(94, 42, 132, 0.2); }
+    .btn-search:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    .filters-container { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filters-container select { padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; outline: none; transition: 0.2s; flex: 1; min-width: 140px; font-weight: 600; }
+    .filters-container select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 42, 132, 0.15); }
+    .btn-limpar { background: #e2e8f0; color: #4a5568; border: 1px solid var(--line); padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-limpar:hover { background: #cbd5e0; color: #2d3748; }
+
+    /* Table */
+    .table-wrap { overflow: auto; max-height: 65vh; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+    th { position: sticky; top: 0; background: #f8f9fa; font-weight: 700; color: var(--accent); z-index: 2; white-space: nowrap; }
+    tr:hover td { background: rgba(94, 42, 132, 0.02); }
+    tr.row-clicavel { cursor: pointer; }
+    
+    /* Badges */
+    .badge { padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-block; white-space: nowrap; }
+    .badge-procedente { background: #c6f6d5; color: #22543d; }
+    .badge-nao-procedente { background: #fed7d7; color: #822727; }
+    .badge-analise { background: #feebc8; color: #744210; }
+    .badge-sem-chamado { background: #edf2f7; color: #4a5568; }
+    .badge-cadastrado { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+
+    #status-global { font-weight: 600; color: var(--muted); text-align: center; padding: 30px; }
+    
+    /* Toast */
+    .toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 10000; font-weight: bold; font-size: 14px; display: none; }
+    .toast-success { background: var(--success); color: white; }
+    .toast-error { background: var(--secondary); color: white; }
+  </style>
+  <script src="/static/chart.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/chart.js';"></script>
+  <script src="/static/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';"></script>
+</head>
+<body>
+
+  <!-- Toast Notificações -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Input oculto para upload de planilhas de desconto -->
+  <input type="file" id="input-upload-desconto" accept=".xlsx,.xls,.csv" style="display:none;" onchange="executarUploadDesconto(this)">
+
+  <main>
+    <!-- Navegação -->
+    <nav class="nav">
+      <div class="nav-links">
+        <a href="/">Consulta TMSLOG</a>
+        <a href="/nova-acareacao">Nova Acareação</a>
+        <a href="/gestao">Gestão de Solicitações</a>
+        <a href="/dashboard">Dashboard</a>
+        {% if is_admin %}
+        <a href="/financeiro" class="active">Financeiro</a>
+        <a href="/usuarios">Usuários</a>
+        <a href="/inconsistencias">Inconsistências</a>
+        <a href="/apresentacao">Apresentação</a>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:15px; align-items:center;">
+        <span style="font-size:13px; font-weight:bold; color:var(--muted)">Olá, {{ usuario }} ({{ perfil }})</span>
+        <a href="/logout" style="background:var(--secondary); color:#fff; border-color:var(--secondary)">Sair</a>
+      </div>
+    </nav>
+
+    <!-- Cabeçalho Corporativo -->
+    <header class="corporate-header">
+      <div class="logos">
+        <img src="/static/logo-jm.png" alt="JM Distribuição" class="jm-logo" onerror="this.outerHTML='<div style=\'display:flex;align-items:center;font-weight:900;font-size:42px;color:var(--accent);letter-spacing:-2px;margin:0;\'>JM<span style=\'color:var(--secondary);font-size:24px;margin-left:4px;margin-top:-14px;\'>TD</span></div>'">
+      </div>
+      <div class="title-area">
+        <h1>Gerência Financeira & Auditoria de Descontos</h1>
+        <p>Conciliação de Descontos Semanal x Acareações Petlove</p>
+      </div>
+    </header>
+
+    <!-- Banner de Regras de Confronto Aplicadas -->
+    <div style="background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 14px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 18px;">🎯</span>
+        <span><strong>Filtro de Confronto Auditado:</strong> Operação = <code>PETLOVE - LAST MILE</code> | Motivos Excluídos: <code>DIF FRETE</code>, <code>GR</code>, <code>MANUTENÇÃO</code></span>
+      </div>
+      <span style="background: #2b6cb0; color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 11px; text-transform: uppercase;">Auditado Conforme Regra</span>
+    </div>
+
+    <!-- Alternador de Modos de Exibição (Tabs Principais) -->
+    <div class="view-mode-tabs">
+      <button class="tab-btn active" id="tab-barometro" onclick="alternarModoExibicao('barometro')">📊 Barômetro & Cruzamento das 3 Bases</button>
+      <button class="tab-btn" id="tab-tabela" onclick="alternarModoExibicao('tabela')">📋 Relação de Lançamentos & Auditoria</button>
+    </div>
+
+    <!-- Visões Gerenciais (Dropdown Lista Suspensa sem Ícones) -->
+    <div class="manager-views-bar" style="display:flex; align-items:center; gap:12px; margin-bottom:20px; background:#fff; padding:12px 20px; border-radius:12px; border:1px solid var(--line); box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+      <label for="select-visao-gerencial" style="font-size:13px; font-weight:700; color:var(--accent); white-space:nowrap;">Visões gerenciais:</label>
+      <select id="select-visao-gerencial" style="padding:8px 14px; border-radius:8px; border:1px solid #cbd5e0; font-size:13px; font-weight:600; color:var(--text); background:#fff; cursor:pointer; min-width:260px;" onchange="setVisaoGerencial(this.value)">
+        <option value="todos">Visão geral (todos)</option>
+        <option value="Enviado para Desconto">Enviados p/ desconto</option>
+        <option value="Não Enviado">Pendentes de envio (não enviados)</option>
+        <option value="Procedente">Perdas confirmadas (procedentes)</option>
+        <option value="Não Procedente">Contestados / estornos</option>
+        <option value="Em Análise">Em análise</option>
+        <option value="desconto_sem_chamado">Descontos sem acareação</option>
+      </select>
+    </div>
+
+    <!-- Cards de Estatísticas Financeiras -->
+    <div class="stats-container">
+      <div class="stat-card total-card" id="card-total" onclick="setVisaoGerencial('todos')">
+        <span class="label">Total no Confronto</span>
+        <span class="value" id="stat-total-val">R$ 0,00</span>
+        <span class="sub-value" id="stat-total-qtd">0 registros analisados</span>
+      </div>
+
+      <div class="stat-card enviado-card" id="card-enviado" onclick="setVisaoGerencial('Enviado para Desconto')">
+        <span class="label">Enviados para Desconto</span>
+        <span class="value" id="stat-enviados-val" style="color: #5e2a84;">R$ 0,00</span>
+        <span class="sub-value" id="stat-enviados-qtd">0 enviados à financeira</span>
+      </div>
+
+      <div class="stat-card nao-enviado-card" id="card-nao-enviado" onclick="setVisaoGerencial('Não Enviado')">
+        <span class="label">Pendente de Envio (Não Enviados)</span>
+        <span class="value" id="stat-nao-enviados-val" style="color: var(--warning);">R$ 0,00</span>
+        <span class="sub-value" id="stat-nao-enviados-qtd">0 acareações sem desconto</span>
+      </div>
+
+      <div class="stat-card procedente-card" id="card-procedente" onclick="setVisaoGerencial('Procedente')">
+        <span class="label">Procedentes (Confirmados)</span>
+        <span class="value" id="stat-procedente-val" style="color: var(--success);">R$ 0,00</span>
+        <span class="sub-value" id="stat-procedente-qtd">0 casos procedentes</span>
+      </div>
+
+      <div class="stat-card nao-procedente-card" id="card-nao-procedente" onclick="setVisaoGerencial('Não Procedente')">
+        <span class="label">Não Procedentes (Contestados)</span>
+        <span class="value" id="stat-nao-procedente-val" style="color: var(--secondary);">R$ 0,00</span>
+        <span class="sub-value" id="stat-nao-procedente-qtd">0 cobranças indevidas</span>
+      </div>
+
+      <div class="stat-card analise-card" id="card-analise" onclick="setVisaoGerencial('Em Análise')">
+        <span class="label">Em Análise (Pendente)</span>
+        <span class="value" id="stat-analise-val" style="color: var(--info);">R$ 0,00</span>
+        <span class="sub-value" id="stat-analise-qtd">0 em análise no fluxo</span>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 1: VISÃO BARÔMETRO FINANCEIRO & MÉTRICAS (HTML/CSS VISUAL METER) -->
+    <div id="secao-barometro" class="barometer-section">
+      
+      <!-- Card Barômetro Especial: Cruzamento Triplo das 3 Bases (Fluxo Diário x TMSLOG x Financeiro Descontado) -->
+      <div class="barometer-card full-width" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-left: 6px solid var(--accent); box-shadow: 0 10px 35px rgba(94,42,132,0.06);">
+        <div class="barometer-title" style="font-size: 18px;">🔗 1. Cruzamento Triplo de Informações (3 Bases Confrontadas)</div>
+        <div class="barometer-subtitle" style="font-size: 13px;">Confronto auditado entre: (1) Base Diária de Acareações, (2) Carga de Rotas TMSLOG e (3) Descontos Efetivados do Motorista</div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 15px;">
+          <div style="background:#fff5f5; border:1px solid #feb2b2; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('desconto_sem_chamado')">
+            <div style="font-size:12px; font-weight:800; color:#9b2c2c; text-transform:uppercase; letter-spacing:0.5px;">🔴 Desconto sem Acareação</div>
+            <div style="font-size:24px; font-weight:900; color:#9b2c2c; margin:6px 0;" id="conf-sem-chamado-val">R$ 0,00</div>
+            <div style="font-size:12px; font-weight:700; color:#c53030;" id="conf-sem-chamado-qtd">0 descontos sem chamado no fluxo</div>
+          </div>
+
+          <div style="background:#f0fff4; border:1px solid #9ae6b4; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('Procedente')">
+            <div style="font-size:12px; font-weight:800; color:#22543d; text-transform:uppercase; letter-spacing:0.5px;">🟢 Desconto Confirmado (Procedente)</div>
+            <div style="font-size:24px; font-weight:900; color:#22543d; margin:6px 0;" id="conf-confirmado-val">R$ 0,00</div>
+            <div style="font-size:12px; font-weight:700; color:#276749;" id="conf-confirmado-qtd">0 casos confirmados no fluxo</div>
+          </div>
+
+          <div style="background:#fffaf0; border:1px solid #fbd38d; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('Não Procedente')">
+            <div style="font-size:12px; font-weight:800; color:#744210; text-transform:uppercase; letter-spacing:0.5px;">🛡️ Desconto Contestável</div>
+            <div style="font-size:24px; font-weight:900; color:#744210; margin:6px 0;" id="conf-contestavel-val">R$ 0,00</div>
+            <div style="font-size:12px; font-weight:700; color:#975a16;" id="conf-contestavel-qtd">0 casos contestados no fluxo</div>
+          </div>
+
+          <div style="background:#ebf8ff; border:1px solid #bee3f8; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('Não Enviado')">
+            <div style="font-size:12px; font-weight:800; color:#2c5282; text-transform:uppercase; letter-spacing:0.5px;">⚠️ Acareação Sem Desconto</div>
+            <div style="font-size:24px; font-weight:900; color:#2c5282; margin:6px 0;" id="conf-pendente-val">R$ 0,00</div>
+            <div style="font-size:12px; font-weight:700; color:#2b6cb0;" id="conf-pendente-qtd">0 chamados pendentes financeiro</div>
+          </div>
+        </div>
+      </div>
+      <div class="barometer-card">
+        <div class="barometer-title">📤 1. Confronto de Envio (Enviados vs Pendentes)</div>
+        <div class="barometer-subtitle">Distribuição percentual do valor financeiro total em aberto x cobrado</div>
+        
+        <div class="meter-container">
+          <div class="meter-header">
+            <span>🟢 Enviados p/ Desconto</span>
+            <span id="bar-text-enviados">0% (R$ 0,00)</span>
+          </div>
+          <div class="meter-bar-outer">
+            <div class="meter-segment bg-accent" id="bar-seg-enviados" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="meter-container" style="margin-top: 15px;">
+          <div class="meter-header">
+            <span>⚠️ Pendentes de Envio (Não Enviados)</span>
+            <span id="bar-text-nao-enviados">0% (R$ 0,00)</span>
+          </div>
+          <div class="meter-bar-outer">
+            <div class="meter-segment bg-warning" id="bar-seg-nao-enviados" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Barômetro 2: Distribuição por Procedência -->
+      <div class="barometer-card">
+        <div class="barometer-title">⚖️ 2. Procedência dos Casos de Acareação</div>
+        <div class="barometer-subtitle">Perdas Confirmadas (JM) x Contestadas (Não Procedentes) x Em Análise</div>
+
+        <div class="meter-container">
+          <div class="meter-header">
+            <span>✅ Procedentes (Confirmados)</span>
+            <span id="bar-text-procedente">0% (R$ 0,00)</span>
+          </div>
+          <div class="meter-bar-outer">
+            <div class="meter-segment bg-success" id="bar-seg-procedente" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="meter-container">
+          <div class="meter-header">
+            <span>🛡️ Contestados (Não Procedentes)</span>
+            <span id="bar-text-nao-procedente">0% (R$ 0,00)</span>
+          </div>
+          <div class="meter-bar-outer">
+            <div class="meter-segment bg-danger" id="bar-seg-nao-procedente" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="meter-container">
+          <div class="meter-header">
+            <span>⏳ Em Análise no Fluxo</span>
+            <span id="bar-text-analise">0% (R$ 0,00)</span>
+          </div>
+          <div class="meter-bar-outer">
+            <div class="meter-segment bg-info" id="bar-seg-analise" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Barômetro 3: Evolução Quinzenal (Cards Progressivos) -->
+      <div class="barometer-card full-width">
+        <div class="barometer-title">📅 3. Resumo por Quinzena (Volume R$ e Qtd)</div>
+        <div class="barometer-subtitle">Evolução dos descontos e acareações divididos por períodos quinzenais</div>
+        <div class="quinzena-grid" id="barometro-quinzenas-container"></div>
+      </div>
+
+      <!-- Card Barômetro 4: Top Regionais por Risco Financeiro -->
+      <div class="barometer-card full-width">
+        <div class="barometer-title">🗺️ 4. Concentração Financeira por Polo Regional</div>
+        <div class="barometer-subtitle">Ranking de impacto financeiro (R$) e volume de ocorrências nas filiais regionais</div>
+        <div class="regional-list" id="barometro-regionais-container"></div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 3: DETALHAMENTO DE LANÇAMENTOS & TABELA -->
+    <section class="card" id="secao-tabela">
+      <div class="toolbar-actions">
+        <h2>Relação de Descontos e Ligação com o Fluxo</h2>
+        <div class="action-buttons">
+          <button class="btn btn-primary" onclick="abrirSeletorArquivo()">📤 Importar Planilha (.xlsx)</button>
+          <button class="btn btn-secondary" onclick="sincronizarBase(this)">🔄 Sincronizar Base</button>
+          <button class="btn btn-success" onclick="exportarRelatorioExcel()">📊 Exportar Relatório Excel</button>
+        </div>
+      </div>
+
+      <!-- Barra de Pesquisa Direta -->
+      <div class="search-row">
+        <input type="text" id="filtro-busca" placeholder="🔍 Digite o ID do Pedido, Nome do Motorista, Rota, Placa ou Regional..." onkeydown="if(event.key==='Enter') renderizarTabela()">
+        <button class="btn-search" onclick="renderizarTabela()">🔍 Pesquisar</button>
+      </div>
+
+      <!-- Filtros Complementares -->
+      <div class="filters-container">
+        <select id="filtro-mes" onchange="renderizarTabela()">
+          <option value="">Mês (todos)</option>
+          <option value="01">Janeiro</option>
+          <option value="02">Fevereiro</option>
+          <option value="03">Março</option>
+          <option value="04">Abril</option>
+          <option value="05">Maio</option>
+          <option value="06">Junho</option>
+          <option value="07">Julho</option>
+          <option value="08">Agosto</option>
+          <option value="09">Setembro</option>
+          <option value="10">Outubro</option>
+          <option value="11">Novembro</option>
+          <option value="12">Dezembro</option>
+        </select>
+
+        <select id="filtro-quinzena-tipo" onchange="renderizarTabela()">
+          <option value="">Quinzena (todas)</option>
+          <option value="Q1">Q1 (1ª quinzena)</option>
+          <option value="Q2">Q2 (2ª quinzena)</option>
+        </select>
+
+        <select id="filtro-quinzena">
+          <option value="">Período combinado (todos)</option>
+        </select>
+        
+        <select id="filtro-status-envio">
+          <option value="">Status de Envio (Todos)</option>
+          <option value="Enviado para Desconto">🟢 Enviado para Desconto</option>
+          <option value="Não Enviado">⚠️ NÃO Enviado para Desconto</option>
+        </select>
+
+        <select id="filtro-procedencia">
+          <option value="">Todas as Procedências</option>
+          <option value="Procedente">Procedente (Confirmado)</option>
+          <option value="Não Procedente">Não Procedente (Contestado)</option>
+          <option value="Em Análise">Em Análise (Pendente)</option>
+          <option value="Sem Chamado">Sem Chamado (Não Cadastrado)</option>
+        </select>
+        <select id="filtro-status-fluxo">
+          <option value="">Status no Fluxo (Todos)</option>
+          <option value="Cadastrado">Com Chamado Cadastrado</option>
+          <option value="Não Cadastrado">Sem Chamado no Fluxo</option>
+        </select>
+        <select id="filtro-origem">
+          <option value="">Origem / Planilha (Todas)</option>
+        </select>
+        <button id="btn-limpar-filtros" class="btn-limpar" onclick="limparFiltros()">🧹 Limpar Filtros</button>
+      </div>
+
+      <div style="font-size:12px; color:var(--muted); font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+        💡 Dica: Dê um duplo clique em qualquer linha para abrir os detalhes da solicitação de acareação correspondente.
+      </div>
+
+      <div id="status-global">Buscando lançamentos financeiros...</div>
+
+      <div class="table-wrap" id="tabela-container" style="display:none;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 110px;">ID Pedido</th>
+              <th style="width: 170px;">Cruzamento 3 Bases</th>
+              <th style="width: 140px;">Status Envio</th>
+              <th style="width: 160px;">Mês / Quinzena</th>
+              <th style="width: 150px;">Planilha de Origem</th>
+              <th>Motorista</th>
+              <th style="width: 90px;">Regional</th>
+              <th style="width: 80px;">Rota</th>
+              <th style="width: 90px;">Placa</th>
+              <th style="width: 110px;">Valor</th>
+              <th style="width: 130px;">Ligação Fluxo</th>
+              <th style="width: 130px;">Procedência</th>
+              <th style="width: 110px; text-align: center;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="financeiro-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let todosRegistros = [];
+    let resumoDados = {};
+    let periodosDados = [];
+    let visaoGerencialAtiva = 'todos';
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.className = isError ? 'toast toast-error' : 'toast toast-success';
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
+
+    const formatMoeda = (val) => Number(val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    function setElementText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    function alternarModoExibicao(modo) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const secBar = document.getElementById('secao-barometro');
+
+      if (modo === 'barometro') {
+        document.getElementById('tab-barometro')?.classList.add('active');
+        if (secBar) secBar.style.display = 'grid';
+      } else if (modo === 'tabela') {
+        document.getElementById('tab-tabela')?.classList.add('active');
+        if (secBar) secBar.style.display = 'none';
+        document.getElementById('secao-tabela')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    async function carregarFinanceiro() {
+      const statusDiv = document.getElementById('status-global');
+      const container = document.getElementById('tabela-container');
+      
+      try {
+        statusDiv.style.display = 'block';
+        statusDiv.textContent = 'Realizando confronto de acareações x descontos enviados...';
+        container.style.display = 'none';
+        
+        const response = await fetch(`/api/financeiro/dados?_=${Date.now()}`);
+        const contentType = response.headers.get("content-type") || "";
+        
+        if (contentType.includes("text/html") || response.status === 401) {
+          window.location.href = "/login?proxima=" + encodeURIComponent(window.location.pathname + window.location.search);
+          return;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data) throw new Error((data && data.erro) || 'Falha ao buscar dados financeiros.');
+
+        todosRegistros = data.registros || [];
+        resumoDados = data.resumo || {};
+        periodosDados = data.periodos || [];
+
+        atualizarKPIs();
+        popularFiltroQuinzenas();
+        popularFiltroOrigens();
+        renderizarTabela();
+
+        statusDiv.style.display = 'none';
+        container.style.display = 'block';
+      } catch (err) {
+        statusDiv.textContent = '❌ ' + err.message;
+        statusDiv.style.color = 'var(--secondary)';
+      }
+    }
+
+    function atualizarKPIs() {
+      setElementText('stat-total-val', formatMoeda(resumoDados.valor_total));
+      setElementText('stat-total-qtd', `${resumoDados.total_registros || 0} casos no confronto`);
+
+      setElementText('stat-enviados-val', formatMoeda(resumoDados.valor_enviados));
+      setElementText('stat-enviados-qtd', `${resumoDados.qtd_enviados || 0} enviados p/ desconto`);
+
+      setElementText('stat-nao-enviados-val', formatMoeda(resumoDados.valor_nao_enviados));
+      setElementText('stat-nao-enviados-qtd', `${resumoDados.qtd_nao_enviados || 0} acareações sem desconto`);
+
+      setElementText('stat-procedente-val', formatMoeda(resumoDados.valor_procedente));
+      setElementText('stat-procedente-qtd', `${resumoDados.qtd_procedente || 0} casos procedentes`);
+
+      setElementText('stat-nao-procedente-val', formatMoeda(resumoDados.valor_nao_procedente || 0));
+      setElementText('stat-nao-procedente-qtd', `${resumoDados.qtd_nao_procedente || 0} cobranças indevidas`);
+
+      setElementText('stat-analise-val', formatMoeda(resumoDados.valor_em_analise));
+      setElementText('stat-analise-qtd', `${resumoDados.qtd_em_analise || 0} em análise no fluxo`);
+
+      // Atualiza Cards do Confronto de 3 Bases (Cruzamento Triplo)
+      setElementText('conf-sem-chamado-val', formatMoeda(resumoDados.valor_desconto_sem_chamado));
+      setElementText('conf-sem-chamado-qtd', `${resumoDados.qtd_desconto_sem_chamado || 0} descontos sem chamado no fluxo`);
+
+      setElementText('conf-confirmado-val', formatMoeda(resumoDados.valor_desconto_confirmado));
+      setElementText('conf-confirmado-qtd', `${resumoDados.qtd_desconto_confirmado || 0} casos confirmados no fluxo`);
+
+      setElementText('conf-contestavel-val', formatMoeda(resumoDados.valor_desconto_contestavel));
+      setElementText('conf-contestavel-qtd', `${resumoDados.qtd_desconto_contestavel || 0} casos contestados no fluxo`);
+
+      setElementText('conf-pendente-val', formatMoeda(resumoDados.valor_pendente_desconto));
+      setElementText('conf-pendente-qtd', `${resumoDados.qtd_pendente_desconto || 0} chamados pendentes financeiro`);
+    }
+
+    function atualizarBarometro(registrosFiltrados) {
+      // 1. Barômetro de Envio
+      let valEnviados = 0, qtdEnviados = 0;
+      let valNaoEnviados = 0, qtdNaoEnviados = 0;
+
+      registrosFiltrados.forEach(r => {
+        const v = (r.valor_desconto_num || 0);
+        if (r.status_envio === 'Enviado para Desconto') {
+          valEnviados += v; qtdEnviados++;
+        } else {
+          valNaoEnviados += v; qtdNaoEnviados++;
+        }
+      });
+
+      const totalValEnvio = valEnviados + valNaoEnviados;
+      const pctEnv = totalValEnvio > 0 ? (valEnviados / totalValEnvio * 100) : 0;
+      const pctNaoEnv = totalValEnvio > 0 ? (valNaoEnviados / totalValEnvio * 100) : 0;
+
+      const barSegEnv = document.getElementById('bar-seg-enviados');
+      if (barSegEnv) barSegEnv.style.width = `${pctEnv.toFixed(1)}%`;
+      setElementText('bar-text-enviados', `${pctEnv.toFixed(1)}% (${formatMoeda(valEnviados)} - ${qtdEnviados} casos)`);
+
+      const barSegNaoEnv = document.getElementById('bar-seg-nao-enviados');
+      if (barSegNaoEnv) barSegNaoEnv.style.width = `${pctNaoEnv.toFixed(1)}%`;
+      setElementText('bar-text-nao-enviados', `${pctNaoEnv.toFixed(1)}% (${formatMoeda(valNaoEnviados)} - ${qtdNaoEnviados} casos)`);
+
+      // 2. Barômetro de Procedência
+      let valProc = 0, qtdProc = 0;
+      let valNaoProc = 0, qtdNaoProc = 0;
+      let valAnalise = 0, qtdAnalise = 0;
+
+      registrosFiltrados.forEach(r => {
+        const v = (r.valor_desconto_num || 0);
+        if (r.procedencia === 'Procedente') { valProc += v; qtdProc++; }
+        else if (r.procedencia === 'Não Procedente') { valNaoProc += v; qtdNaoProc++; }
+        else { valAnalise += v; qtdAnalise++; }
+      });
+
+      const totalValProc = valProc + valNaoProc + valAnalise;
+      const pctProc = totalValProc > 0 ? (valProc / totalValProc * 100) : 0;
+      const pctNaoProc = totalValProc > 0 ? (valNaoProc / totalValProc * 100) : 0;
+      const pctAna = totalValProc > 0 ? (valAnalise / totalValProc * 100) : 0;
+
+      document.getElementById('bar-seg-procedente')?.style.setProperty('width', `${pctProc.toFixed(1)}%`);
+      setElementText('bar-text-procedente', `${pctProc.toFixed(1)}% (${formatMoeda(valProc)} - ${qtdProc} casos)`);
+
+      document.getElementById('bar-seg-nao-procedente')?.style.setProperty('width', `${pctNaoProc.toFixed(1)}%`);
+      setElementText('bar-text-nao-procedente', `${pctNaoProc.toFixed(1)}% (${formatMoeda(valNaoProc)} - ${qtdNaoProc} casos)`);
+
+      document.getElementById('bar-seg-analise')?.style.setProperty('width', `${pctAna.toFixed(1)}%`);
+      setElementText('bar-text-analise', `${pctAna.toFixed(1)}% (${formatMoeda(valAnalise)} - ${qtdAnalise} casos)`);
+
+      // 3. Barômetro de Quinzenas
+      const quinzenasMap = {};
+      periodosDados.slice().reverse().forEach(p => {
+        quinzenasMap[p.code] = { 
+          label: p.label, 
+          val: 0, 
+          qtd: 0 
+        };
+      });
+
+      registrosFiltrados.forEach(r => {
+        const qCode = r.quinzena_code;
+        if (!qCode) return;
+        if (!quinzenasMap[qCode]) {
+          quinzenasMap[qCode] = { label: r.quinzena_label || qCode, val: 0, qtd: 0 };
+        }
+        quinzenasMap[qCode].val += (r.valor_desconto_num || 0);
+        quinzenasMap[qCode].qtd += 1;
+      });
+
+      const qKeys = Object.keys(quinzenasMap);
+      const maxValQuinzena = Math.max(...qKeys.map(k => quinzenasMap[k].val), 1);
+      const qContainer = document.getElementById('barometro-quinzenas-container');
+      
+      if (qContainer) {
+        qContainer.innerHTML = '';
+        qKeys.forEach(k => {
+          const item = quinzenasMap[k];
+          const pctWidth = (item.val / maxValQuinzena * 100);
+          
+          const box = document.createElement('div');
+          box.className = 'quinzena-box';
+          box.innerHTML = `
+            <div class="quinzena-box-title">
+              <span>📅 ${escapeHtml(item.label)}</span>
+              <span>${item.qtd} casos</span>
+            </div>
+            <div class="quinzena-box-val">${formatMoeda(item.val)}</div>
+            <div class="meter-bar-outer" style="height: 8px; margin-top: 10px;">
+              <div class="meter-segment bg-accent" style="width: ${pctWidth.toFixed(1)}%;"></div>
+            </div>
+          `;
+          qContainer.appendChild(box);
+        });
+      }
+
+      // 4. Barômetro Ranking Regional
+      const regMap = {};
+      registrosFiltrados.forEach(r => {
+        const reg = (r.regional || 'Não Informado').trim().toUpperCase();
+        if (!regMap[reg]) regMap[reg] = { val: 0, qtd: 0 };
+        regMap[reg].val += (r.valor_desconto_num || 0);
+        regMap[reg].qtd += 1;
+      });
+
+      const sortedRegs = Object.keys(regMap).sort((a,b) => regMap[b].val - regMap[a].val);
+      const maxRegVal = sortedRegs.length > 0 ? regMap[sortedRegs[0]].val : 1;
+      const regContainer = document.getElementById('barometro-regionais-container');
+
+      if (regContainer) {
+        regContainer.innerHTML = '';
+        sortedRegs.forEach(reg => {
+          const data = regMap[reg];
+          const pctWidth = (data.val / maxRegVal * 100);
+
+          const rItem = document.createElement('div');
+          rItem.className = 'regional-item';
+          rItem.innerHTML = `
+            <div class="regional-info">
+              <span>🏢 ${escapeHtml(reg)}</span>
+              <span>${formatMoeda(data.val)} (${data.qtd} ocorrencias)</span>
+            </div>
+            <div class="meter-bar-outer" style="height: 12px;">
+              <div class="meter-segment bg-accent" style="width: ${pctWidth.toFixed(1)}%;"></div>
+            </div>
+          `;
+          regContainer.appendChild(rItem);
+        });
+      }
+    }
+
+    function popularFiltroQuinzenas() {
+      const select = document.getElementById('filtro-quinzena');
+      if (!select) return;
+      select.innerHTML = '<option value="">📅 Período / Quinzena (Todos)</option>';
+      
+      periodosDados.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.code;
+        opt.textContent = p.label;
+        select.appendChild(opt);
+      });
+    }
+
+    function popularFiltroOrigens() {
+      const select = document.getElementById('filtro-origem');
+      if (!select) return;
+      const origens = [...new Set(todosRegistros.map(r => r.origem_arquivo).filter(Boolean))];
+      
+      select.innerHTML = '<option value="">Origem / Planilha (Todas)</option>';
+      origens.sort().forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o;
+        opt.textContent = o;
+        select.appendChild(opt);
+      });
+    }
+
+    function setVisaoGerencial(visaoKey) {
+      visaoGerencialAtiva = visaoKey;
+      const sel = document.getElementById('select-visao-gerencial');
+      if (sel) sel.value = visaoKey;
+      renderizarTabela();
+    }
+
+    function renderizarTabela() {
+      const tbody = document.getElementById('financeiro-tbody');
+      tbody.innerHTML = '';
+
+      const buscaVal = document.getElementById('filtro-busca').value.toLowerCase().trim();
+      const quinzenaVal = document.getElementById('filtro-quinzena').value;
+      const mesVal = document.getElementById('filtro-mes') ? document.getElementById('filtro-mes').value : '';
+      const qTipoVal = document.getElementById('filtro-quinzena-tipo') ? document.getElementById('filtro-quinzena-tipo').value : '';
+      const statusEnvioVal = document.getElementById('filtro-status-envio').value;
+      const procVal = document.getElementById('filtro-procedencia').value;
+      const statusFluxoVal = document.getElementById('filtro-status-fluxo').value;
+      const origemVal = document.getElementById('filtro-origem').value;
+
+      const filtrados = todosRegistros.filter(r => {
+        const textFull = `${r.pedido_id} ${r.motorista} ${r.regional} ${r.rota} ${r.placa} ${r.origem_arquivo} ${r.responsavel} ${r.status_envio}`.toLowerCase();
+        const matchBusca = !buscaVal || textFull.includes(buscaVal);
+        
+        let matchQuinzena = true;
+        if (quinzenaVal) matchQuinzena = (r.quinzena_code === quinzenaVal);
+
+        let matchMes = true;
+        if (mesVal) {
+          matchMes = r.quinzena_code && r.quinzena_code.split('-')[1] === mesVal;
+        }
+
+        let matchQTipo = true;
+        if (qTipoVal) {
+          matchQTipo = r.quinzena_code && r.quinzena_code.endsWith(qTipoVal);
+        }
+
+        let matchStatusEnvio = true;
+        if (statusEnvioVal) matchStatusEnvio = (r.status_envio === statusEnvioVal);
+
+        let matchProc = true;
+        if (procVal) matchProc = (r.procedencia === procVal);
+        
+        let matchStatusFluxo = true;
+        if (statusFluxoVal === 'Cadastrado') matchStatusFluxo = r.tem_chamado;
+        else if (statusFluxoVal === 'Não Cadastrado') matchStatusFluxo = !r.tem_chamado;
+
+        let matchOrigem = true;
+        if (origemVal) matchOrigem = (r.origem_arquivo === origemVal);
+
+        let matchVisao = true;
+        if (visaoGerencialAtiva !== 'todos') {
+          if (visaoGerencialAtiva === 'desconto_sem_chamado') {
+            matchVisao = (r.status_triangulacao === 'Desconto sem Acareação');
+          } else if (visaoGerencialAtiva === 'Enviado para Desconto' || visaoGerencialAtiva === 'Não Enviado') {
+            matchVisao = (r.status_envio === visaoGerencialAtiva);
+          } else {
+            matchVisao = (r.procedencia === visaoGerencialAtiva);
+          }
+        }
+
+        return matchBusca && matchQuinzena && matchMes && matchQTipo && matchStatusEnvio && matchProc && matchStatusFluxo && matchOrigem && matchVisao;
+      });
+
+      // Atualiza o Barômetro Visual de Métricas HTML/CSS (100% Garantido)
+      atualizarBarometro(filtrados);
+
+      if (filtrados.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="13" style="text-align:center; color:var(--muted); padding:30px; font-weight:bold;">Nenhum registro encontrado para os filtros e visão selecionados.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      filtrados.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'row-clicavel';
+
+        let procBadgeClass = 'badge-sem-chamado';
+        if (item.procedencia === 'Procedente') procBadgeClass = 'badge-procedente';
+        else if (item.procedencia === 'Não Procedente') procBadgeClass = 'badge-nao-procedente';
+        else if (item.procedencia === 'Em Análise') procBadgeClass = 'badge-analise';
+
+        const isEnviado = (item.status_envio === 'Enviado para Desconto');
+        const statusEnvioBadge = isEnviado
+          ? `<span class="badge" style="background:#e9d8fd; color:#553c9a; border:1px solid #d6bcfa;">🟢 Enviado</span>`
+          : `<span class="badge" style="background:#feebc8; color:#744210; border:1px solid #fbd38d;">⚠️ NÃO Enviado</span>`;
+
+        const statusFluxoBadge = item.tem_chamado 
+          ? `<span class="badge badge-cadastrado">🟢 Cadastrado</span>`
+          : `<span class="badge badge-sem-chamado">🟡 Não Cadastrado</span>`;
+
+        let acaoBtn = '';
+        if (item.tem_chamado) {
+          acaoBtn = `<a href="/fluxo?pedido=${encodeURIComponent(item.pedido_id)}" class="btn btn-primary btn-small">👁️ Ver Caso</a>`;
+        } else {
+          acaoBtn = `<a href="/nova-acareacao?pedido=${encodeURIComponent(item.pedido_id)}" class="btn btn-secondary btn-small" title="Abrir acareação para este desconto">➕ Abrir Caso</a>`;
+        }
+
+        tr.ondblclick = () => {
+          if (item.tem_chamado) {
+            window.location.href = `/fluxo?pedido=${encodeURIComponent(item.pedido_id)}`;
+          } else {
+            window.location.href = `/gestao?busca=${encodeURIComponent(item.pedido_id)}`;
+          }
+        };
+
+        const quinzenaDisplay = item.quinzena_label || '-';
+
+        tr.innerHTML = `
+          <td style="font-weight:bold; color:var(--accent);">${escapeHtml(item.pedido_id)}</td>
+          <td><span style="font-size:12px; font-weight:700;">${escapeHtml(item.badge_triangulacao || '')}</span></td>
+          <td>${statusEnvioBadge}</td>
+          <td style="font-size:12px; font-weight:bold; color:var(--text);">${escapeHtml(quinzenaDisplay)}</td>
+          <td style="font-size:12px; color:var(--muted);" title="${escapeHtml(item.origem_arquivo)}">${escapeHtml(item.origem_arquivo)}</td>
+          <td><strong>${escapeHtml(item.motorista)}</strong></td>
+          <td>${escapeHtml(item.regional)}</td>
+          <td>${escapeHtml(item.rota)}</td>
+          <td>${escapeHtml(item.placa)}</td>
+          <td style="font-weight:bold; color:var(--accent);">${escapeHtml(item.valor_desconto || formatMoeda(item.valor_desconto_num))}</td>
+          <td>${statusFluxoBadge}</td>
+          <td><span class="badge ${procBadgeClass}">${escapeHtml(item.procedencia)}</span></td>
+          <td style="text-align:center;">${acaoBtn}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function limparFiltros() {
+      document.getElementById('filtro-busca').value = '';
+      if (document.getElementById('filtro-mes')) document.getElementById('filtro-mes').value = '';
+      if (document.getElementById('filtro-quinzena-tipo')) document.getElementById('filtro-quinzena-tipo').value = '';
+      document.getElementById('filtro-quinzena').value = '';
+      document.getElementById('filtro-status-envio').value = '';
+      document.getElementById('filtro-procedencia').value = '';
+      document.getElementById('filtro-status-fluxo').value = '';
+      document.getElementById('filtro-origem').value = '';
+      setVisaoGerencial('todos');
+    }
+
+    // Event Listeners dos filtros
+    ['filtro-mes', 'filtro-quinzena-tipo', 'filtro-quinzena', 'filtro-status-envio', 'filtro-procedencia', 'filtro-status-fluxo', 'filtro-origem'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', renderizarTabela);
+    });
+
+    function abrirSeletorArquivo() {
+      document.getElementById('input-upload-desconto').click();
+    }
+
+    async function executarUploadDesconto(input) {
+      if (!input.files || input.files.length === 0) return;
+      const file = input.files[0];
+      
+      const formData = new FormData();
+      formData.append('arquivo', file);
+      
+      showToast(`Enviando planilha ${file.name}...`);
+      
+      try {
+        const response = await fetch('/api/financeiro/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.erro || 'Falha ao enviar arquivo.');
+        
+        showToast(`✅ ${data.mensagem || 'Planilha importada com sucesso!'}`);
+        carregarFinanceiro();
+      } catch (err) {
+        showToast(`❌ ${err.message}`, true);
+      } finally {
+        input.value = '';
+      }
+    }
+
+    async function sincronizarBase(btn) {
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '🔄 Sincronizando...';
+      
+      try {
+        const response = await fetch('/api/financeiro/sincronizar', { method: 'POST' });
+        const data = await response.json();
+        
+        if (!response.ok) throw new Error(data.erro || 'Falha ao sincronizar.');
+        
+        showToast(`✅ Base sincronizada! ${data.total_importados} descontos atualizados.`);
+        carregarFinanceiro();
+      } catch (err) {
+        showToast(`❌ ${err.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+      }
+    }
+
+    function exportarRelatorioExcel() {
+      if (todosRegistros.length === 0) {
+        showToast('Nenhum dado para exportar.', true);
+        return;
+      }
+
+      const exportData = todosRegistros.map(r => ({
+        "ID Pedido": r.pedido_id,
+        "Origem / Planilha": r.origem_arquivo,
+        "Motorista": r.motorista,
+        "Regional": r.regional,
+        "Rota": r.rota,
+        "Placa": r.placa,
+        "Valor Desconto": r.valor_desconto,
+        "Status no Fluxo": r.status_chamado,
+        "Procedência do Caso": r.procedencia,
+        "Responsável Análise": r.responsavel,
+        "Criado Por": r.criado_por,
+        "Justificativa": r.justificativa,
+        "Tratativa": r.tratativa,
+        "Data Importação": r.data_importacao
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Financeiro Descontos");
+      XLSX.writeFile(wb, `Relatorio_Financeiro_Descontos_Petlove_${Date.now()}.xlsx`);
+    }
+
+    function escapeHtml(v) {
+      const e = document.createElement('span');
+      e.textContent = v ?? '';
+      return e.innerHTML;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      carregarFinanceiro();
+      setInterval(() => {
+        carregarFinanceiro();
+      }, 30000);
+    });
+
+    window.addEventListener('focus', () => {
+      carregarFinanceiro();
+    });
+  </script>
+</body>
+</html>

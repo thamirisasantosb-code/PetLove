@@ -32,8 +32,7 @@
       margin: 30px auto;
     }
     
-    /* Nav */
-    .nav { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; justify-content: space-between; }
+    .nav { position: sticky; top: 0; z-index: 1000; background: var(--bg); padding: 12px 0; margin-bottom: 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 15px; }
     .nav-links { display:flex; gap:15px; }
     .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
     .nav a:hover { background: var(--line); }
@@ -101,11 +100,10 @@
         <a href="/nova-acareacao">Nova Acareação</a>
         <a href="/gestao">Gestão de Solicitações</a>
         <a href="/dashboard">Dashboard</a>
-        {% if session.usuario == 'admin@jm.com' %}
+        {% if is_admin %}
+        <a href="/financeiro">Financeiro</a>
         <a href="/usuarios">Usuários</a>
         <a href="/inconsistencias" class="active">Inconsistências</a>
-        {% endif %}
-        {% if session.perfil == 'Admin' %}
         <a href="/apresentacao">Apresentação</a>
         {% endif %}
       </div>
@@ -184,9 +182,16 @@
       
       try {
         const response = await fetch('/api/inconsistencias');
-        const dados = await response.json();
+        const contentType = response.headers.get("content-type") || "";
         
-        if (!response.ok) throw new Error(dados.erro || 'Falha ao buscar inconsistências.');
+        if (contentType.includes("text/html") || response.status === 401) {
+          window.location.href = "/login?proxima=" + encodeURIComponent(window.location.pathname + window.location.search);
+          return;
+        }
+
+        const dados = await response.json().catch(() => null);
+        
+        if (!response.ok || !dados) throw new Error((dados && dados.erro) || `Falha ao buscar inconsistências (Código: ${response.status}).`);
         
         tbody.innerHTML = '';
         

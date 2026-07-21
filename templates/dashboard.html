@@ -10,7 +10,7 @@
     main{width:min(1400px,96%);margin:30px auto;}
     
     /* Nav */
-    .nav { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; justify-content: space-between; }
+    .nav { position: sticky; top: 0; z-index: 1000; background: var(--bg); padding: 12px 0; margin-bottom: 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 15px; }
     .nav-links { display:flex; gap:15px; }
     .nav a { text-decoration: none; padding: 10px 20px; background: var(--card); color: var(--accent); font-weight: bold; border-radius: 8px; border: 1px solid var(--line); transition: 0.2s; }
     .nav a:hover { background: var(--line); }
@@ -43,8 +43,8 @@
       .charts-grid { grid-template-columns: 1fr; }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="/static/chart.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/chart.js';"></script>
+  <script src="/static/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';"></script>
 </head>
 <body><main>
   <div class="nav">
@@ -53,11 +53,10 @@
       <a href="/nova-acareacao">Nova Acareação</a>
       <a href="/gestao">Gestão de Solicitações</a>
       <a href="/dashboard" class="active">Dashboard</a>
-      {% if session.usuario == 'admin@jm.com' %}
+      {% if is_admin %}
+      <a href="/financeiro">Financeiro</a>
       <a href="/usuarios">Usuários</a>
       <a href="/inconsistencias">Inconsistências</a>
-      {% endif %}
-      {% if session.perfil == 'Admin' %}
       <a href="/apresentacao">Apresentação</a>
       {% endif %}
     </div>
@@ -123,8 +122,13 @@
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     const response = await fetch('/api/fluxo/todos');
-    const dados = await response.json();
-    if (!response.ok) throw new Error(dados.erro || 'Falha ao buscar os dados.');
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("text/html") || response.status === 401) {
+      window.location.href = "/login?proxima=" + encodeURIComponent(window.location.pathname + window.location.search);
+      return;
+    }
+    const dados = await response.json().catch(() => null);
+    if (!response.ok || !dados) throw new Error((dados && dados.erro) || `Falha ao buscar os dados (Código: ${response.status}).`);
     
     document.getElementById('status').style.display = 'none';
     document.getElementById('dashboard-content').style.display = 'block';
@@ -148,10 +152,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         return 'Elen Caroline Silva do Carmo';
       }
       if (n.includes('thamiris') || n.includes('thamires')) {
-        return 'Thamiris Almeida Santos';
+        return 'Thamiris Santos';
       }
       if (n.includes('daniela')) {
-        return 'Daniela Aparecida Vieira da Silva';
+        return 'Daniela Silva';
+      }
+      if (n.includes('guilherme')) {
+        return 'Guilherme Farias';
       }
       if (n.includes('desconto')) {
         return 'Desconto';
