@@ -312,8 +312,30 @@
       
       <!-- Card Barômetro Especial: Cruzamento Triplo das 3 Bases (Fluxo Diário x TMSLOG x Financeiro Descontado) -->
       <div class="barometer-card full-width" style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-left: 6px solid var(--accent); box-shadow: 0 10px 35px rgba(94,42,132,0.06);">
-        <div class="barometer-title" style="font-size: 18px;">🔗 1. Cruzamento Triplo de Informações (3 Bases Confrontadas)</div>
-        <div class="barometer-subtitle" style="font-size: 13px;">Confronto auditado entre: (1) Base Diária de Acareações, (2) Carga de Rotas TMSLOG e (3) Descontos Efetivados do Motorista</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:10px;">
+          <div>
+            <div class="barometer-title" style="font-size: 18px;">🔗 1. Cruzamento Triplo de Informações (3 Bases Confrontadas)</div>
+            <div class="barometer-subtitle" style="font-size: 13px;">Confronto auditado entre: (1) Base Diária de Acareações, (2) Carga de Rotas TMSLOG e (3) Descontos Efetivados do Motorista</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; background:#fff; padding:6px 14px; border-radius:10px; border:1px solid #cbd5e0; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+            <label for="select-filtro-mes-card" style="font-size:12px; font-weight:800; color:var(--accent); text-transform:uppercase;">📅 Filtrar por Mês:</label>
+            <select id="select-filtro-mes-card" style="padding:6px 12px; border-radius:8px; border:1px solid #cbd5e0; font-size:13px; font-weight:700; color:var(--text); background:#fff; cursor:pointer;" onchange="sincronizarFiltroMes(this.value)">
+              <option value="">Todos os Meses</option>
+              <option value="01">Janeiro</option>
+              <option value="02">Fevereiro</option>
+              <option value="03">Março</option>
+              <option value="04">Abril</option>
+              <option value="05">Maio</option>
+              <option value="06">Junho</option>
+              <option value="07">Julho</option>
+              <option value="08">Agosto</option>
+              <option value="09">Setembro</option>
+              <option value="10">Outubro</option>
+              <option value="11">Novembro</option>
+              <option value="12">Dezembro</option>
+            </select>
+          </div>
+        </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 15px;">
           <div style="background:#fff5f5; border:1px solid #feb2b2; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('desconto_sem_chamado')" title="Clique para ver o estudo detalhado deste balão">
@@ -865,10 +887,10 @@
     }
 
     function sincronizarFiltroMes(val) {
-      const elTop = document.getElementById('select-filtro-mes-top');
-      const elFilter = document.getElementById('filtro-mes');
-      if (elTop && elTop.value !== val) elTop.value = val;
-      if (elFilter && elFilter.value !== val) elFilter.value = val;
+      ['select-filtro-mes-top', 'select-filtro-mes-card', 'filtro-mes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value !== val) el.value = val;
+      });
       renderizarTabela();
     }
 
@@ -1060,8 +1082,9 @@
       const buscaVal = document.getElementById('filtro-busca').value.toLowerCase().trim();
       const quinzenaVal = document.getElementById('filtro-quinzena').value;
       const topMes = document.getElementById('select-filtro-mes-top') ? document.getElementById('select-filtro-mes-top').value : '';
+      const cardMes = document.getElementById('select-filtro-mes-card') ? document.getElementById('select-filtro-mes-card').value : '';
       const filterMes = document.getElementById('filtro-mes') ? document.getElementById('filtro-mes').value : '';
-      const mesVal = topMes || filterMes;
+      const mesVal = topMes || cardMes || filterMes;
       const qTipoVal = document.getElementById('filtro-quinzena-tipo') ? document.getElementById('filtro-quinzena-tipo').value : '';
       const statusEnvioVal = document.getElementById('filtro-status-envio').value;
       const procVal = document.getElementById('filtro-procedencia').value;
@@ -1187,6 +1210,7 @@
     function limparFiltros() {
       document.getElementById('filtro-busca').value = '';
       if (document.getElementById('select-filtro-mes-top')) document.getElementById('select-filtro-mes-top').value = '';
+      if (document.getElementById('select-filtro-mes-card')) document.getElementById('select-filtro-mes-card').value = '';
       if (document.getElementById('filtro-mes')) document.getElementById('filtro-mes').value = '';
       if (document.getElementById('filtro-quinzena-tipo')) document.getElementById('filtro-quinzena-tipo').value = '';
       document.getElementById('filtro-quinzena').value = '';
