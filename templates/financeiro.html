@@ -414,10 +414,10 @@
         </div>
       </div>
 
-      <!-- Card Barômetro 3: Evolução Quinzenal (Cards Progressivos) -->
+      <!-- Card Barômetro 3: Evolução Quinzenal (Descontos Efetivados Base Pagos) -->
       <div class="barometer-card full-width">
-        <div class="barometer-title">📅 3. Resumo por Quinzena (Volume R$ e Qtd)</div>
-        <div class="barometer-subtitle">Evolução dos descontos e acareações divididos por períodos quinzenais</div>
+        <div class="barometer-title">📅 3. Resumo por Quinzena - Descontos Efetivados (Base Pagos PETLOVE)</div>
+        <div class="barometer-subtitle">Valores (R$) e quantidade de casos efetivamente descontados que constam na planilha Base Pagos - PETLOVE por quinzena</div>
         <div class="quinzena-grid" id="barometro-quinzenas-container"></div>
       </div>
     </div>
@@ -701,8 +701,11 @@
         if (!quinzenasMap[qCode]) {
           quinzenasMap[qCode] = { label: r.quinzena_label || qCode, val: 0, qtd: 0 };
         }
-        quinzenasMap[qCode].val += (r.valor_desconto_num || 0);
-        quinzenasMap[qCode].qtd += 1;
+        // Considera apenas os valores dos descontos que constam na planilha Base Pagos - PETLOVE
+        if (r.status_efetivacao === 'Efetivamente Descontado' || r.responsabilidade_custo === 'Descontado Motorista') {
+          quinzenasMap[qCode].val += (r.valor_desconto_num || 0);
+          quinzenasMap[qCode].qtd += 1;
+        }
       });
 
       const qKeys = Object.keys(quinzenasMap);
