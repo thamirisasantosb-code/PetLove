@@ -234,7 +234,9 @@
         <label for="select-visao-gerencial" style="font-size:13px; font-weight:700; color:var(--accent); white-space:nowrap;">Visões gerenciais:</label>
         <select id="select-visao-gerencial" style="padding:8px 14px; border-radius:8px; border:1px solid #cbd5e0; font-size:13px; font-weight:600; color:var(--text); background:#fff; cursor:pointer; min-width:240px;" onchange="setVisaoGerencial(this.value)">
           <option value="todos">Visão geral (todos)</option>
-          <option value="Enviado para Desconto">Enviados p/ desconto</option>
+          <option value="efetivamente_descontado">💳 Efetivamente descontado pelo financeiro (Base Pagos)</option>
+          <option value="enviado_previa">📤 Enviado para desconto (prévia / pendente efetivação)</option>
+          <option value="Enviado para Desconto">Enviados p/ desconto (total acumulado)</option>
           <option value="Não Enviado">Pendentes de envio (não enviados)</option>
           <option value="Procedente">Perdas confirmadas (procedentes)</option>
           <option value="Não Procedente">Contestados / estornos</option>
@@ -855,6 +857,10 @@
         if (visaoGerencialAtiva !== 'todos') {
           if (visaoGerencialAtiva === 'desconto_sem_chamado') {
             matchVisao = (r.status_triangulacao === 'Desconto sem Acareação');
+          } else if (visaoGerencialAtiva === 'efetivamente_descontado') {
+            matchVisao = (r.status_efetivacao === 'Efetivamente Descontado');
+          } else if (visaoGerencialAtiva === 'enviado_previa') {
+            matchVisao = (r.status_efetivacao === 'Enviado p/ Desconto (Prévia)');
           } else if (visaoGerencialAtiva === 'custo_jm') {
             matchVisao = (r.responsabilidade_custo === 'Custo JM');
           } else if (visaoGerencialAtiva === 'descontado_motorista') {
