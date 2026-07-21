@@ -316,37 +316,37 @@
         <div class="barometer-subtitle" style="font-size: 13px;">Confronto auditado entre: (1) Base Diária de Acareações, (2) Carga de Rotas TMSLOG e (3) Descontos Efetivados do Motorista</div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 15px;">
-          <div style="background:#fff5f5; border:1px solid #feb2b2; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('desconto_sem_chamado')">
+          <div style="background:#fff5f5; border:1px solid #feb2b2; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('desconto_sem_chamado')" title="Clique para ver o estudo detalhado deste balão">
             <div style="font-size:12px; font-weight:800; color:#9b2c2c; text-transform:uppercase; letter-spacing:0.5px;">🔴 Desconto sem Acareação</div>
             <div style="font-size:24px; font-weight:900; color:#9b2c2c; margin:6px 0;" id="conf-sem-chamado-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#c53030;" id="conf-sem-chamado-qtd">0 descontos sem chamado no fluxo</div>
           </div>
 
-          <div style="background:#f0fff4; border:1px solid #9ae6b4; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('Procedente')">
+          <div style="background:#f0fff4; border:1px solid #9ae6b4; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('Procedente')" title="Clique para ver o estudo detalhado deste balão">
             <div style="font-size:12px; font-weight:800; color:#22543d; text-transform:uppercase; letter-spacing:0.5px;">🟢 Desconto Confirmado (Procedente)</div>
             <div style="font-size:24px; font-weight:900; color:#22543d; margin:6px 0;" id="conf-confirmado-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#276749;" id="conf-confirmado-qtd">0 casos confirmados no fluxo</div>
           </div>
 
-          <div style="background:#fffaf0; border:1px solid #fbd38d; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('Não Procedente')">
+          <div style="background:#fffaf0; border:1px solid #fbd38d; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('Não Procedente')" title="Clique para ver o estudo detalhado deste balão">
             <div style="font-size:12px; font-weight:800; color:#744210; text-transform:uppercase; letter-spacing:0.5px;">🛡️ Desconto Contestável</div>
             <div style="font-size:24px; font-weight:900; color:#744210; margin:6px 0;" id="conf-contestavel-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#975a16;" id="conf-contestavel-qtd">0 casos contestados no fluxo</div>
           </div>
 
-          <div style="background:#ebf8ff; border:1px solid #bee3f8; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('Não Enviado')">
+          <div style="background:#ebf8ff; border:1px solid #bee3f8; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('Não Enviado')" title="Clique para ver o estudo detalhado deste balão">
             <div style="font-size:12px; font-weight:800; color:#2c5282; text-transform:uppercase; letter-spacing:0.5px;">⚠️ Acareação Sem Desconto</div>
             <div style="font-size:24px; font-weight:900; color:#2c5282; margin:6px 0;" id="conf-pendente-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#2b6cb0;" id="conf-pendente-qtd">0 chamados pendentes financeiro</div>
           </div>
 
-          <div style="background:#edf2f7; border:1px solid #cbd5e0; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('custo_jm')">
+          <div style="background:#edf2f7; border:1px solid #cbd5e0; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('custo_jm')" title="Clique para ver o estudo detalhado deste balão">
             <div style="font-size:12px; font-weight:800; color:#2d3748; text-transform:uppercase; letter-spacing:0.5px;">🏢 Custo JM (Não Descontado)</div>
             <div style="font-size:24px; font-weight:900; color:#2d3748; margin:6px 0;" id="conf-custo-jm-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#4a5568;" id="conf-custo-jm-qtd">0 perdas absorvidas pela empresa</div>
           </div>
 
-          <div style="background:#e6fffa; border:1px solid #81e6d9; padding:18px; border-radius:14px; cursor:pointer;" onclick="setVisaoGerencial('descontado_motorista')">
+          <div style="background:#e6fffa; border:1px solid #81e6d9; padding:18px; border-radius:14px; cursor:pointer;" onclick="abrirEstudoBalao('descontado_motorista')" title="Clique para ver o estudo detalhado deste balão">
             <div style="font-size:12px; font-weight:800; color:#234e52; text-transform:uppercase; letter-spacing:0.5px;">🟢 Descontado Motorista (Base Pagos)</div>
             <div style="font-size:24px; font-weight:900; color:#234e52; margin:6px 0;" id="conf-descontado-mot-val">R$ 0,00</div>
             <div style="font-size:12px; font-weight:700; color:#2c7a7b;" id="conf-descontado-mot-qtd">0 descontos efetuados ao motorista</div>
@@ -520,6 +520,74 @@
         </table>
       </div>
     </section>
+
+    <!-- Modal de Estudo Detalhado do Balão -->
+    <div id="modal-estudo-balao" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);">
+      <div style="background:#fff; border-radius:16px; max-width:900px; width:100%; max-height:90vh; overflow-y:auto; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); border:1px solid var(--line); position:relative;">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #edf2f7; padding-bottom:14px; margin-bottom:18px;">
+          <div>
+            <h2 id="estudo-modal-titulo" style="margin:0; font-size:20px; color:var(--accent); font-weight:800;">🔍 Estudo Detalhado do Balão</h2>
+            <div id="estudo-modal-subtitulo" style="font-size:13px; color:var(--muted); font-weight:600; margin-top:4px;">Análise analítica aprofundada dos casos cruzados</div>
+          </div>
+          <button onclick="fecharModalEstudo()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#a0aec0; font-weight:bold;">&times;</button>
+        </div>
+
+        <!-- KPIs Resumo do Estudo -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:20px;">
+          <div style="background:#f7fafc; padding:14px; border-radius:10px; border:1px solid #e2e8f0;">
+            <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Montante Financeiro</div>
+            <div id="estudo-kpi-val" style="font-size:20px; font-weight:900; color:var(--accent); margin-top:4px;">R$ 0,00</div>
+          </div>
+          <div style="background:#f7fafc; padding:14px; border-radius:10px; border:1px solid #e2e8f0;">
+            <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Volume de Ocorrências</div>
+            <div id="estudo-kpi-qtd" style="font-size:20px; font-weight:900; color:var(--text); margin-top:4px;">0 casos</div>
+          </div>
+          <div style="background:#f7fafc; padding:14px; border-radius:10px; border:1px solid #e2e8f0;">
+            <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase;">Ticket Médio por Caso</div>
+            <div id="estudo-kpi-medio" style="font-size:20px; font-weight:900; color:#2b6cb0; margin-top:4px;">R$ 0,00</div>
+          </div>
+        </div>
+
+        <!-- Rank Top Motoristas & Top Regionais do Balão -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:20px;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px;">
+            <div style="font-weight:800; font-size:13px; color:var(--accent); margin-bottom:10px;">🏆 Top Motoristas com Maior Impacto</div>
+            <div id="estudo-top-motoristas" style="font-size:12px; color:var(--text);"></div>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px;">
+            <div style="font-weight:800; font-size:13px; color:var(--accent); margin-bottom:10px;">🗺️ Top Regionais Atingidas</div>
+            <div id="estudo-top-regionais" style="font-size:12px; color:var(--text);"></div>
+          </div>
+        </div>
+
+        <!-- Prévia dos Casos (Primeiros 10 Registros) -->
+        <div style="margin-bottom:16px;">
+          <div style="font-weight:800; font-size:13px; color:var(--text); margin-bottom:8px;">📋 Amostra dos Casos Auditados Neste Balão:</div>
+          <div style="max-height:220px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+              <thead>
+                <tr style="background:#edf2f7; text-align:left;">
+                  <th style="padding:8px 12px;">Pedido ID</th>
+                  <th style="padding:8px 12px;">Motorista</th>
+                  <th style="padding:8px 12px;">Regional</th>
+                  <th style="padding:8px 12px;">Valor R$</th>
+                  <th style="padding:8px 12px;">Planilha Origem</th>
+                </tr>
+              </thead>
+              <tbody id="estudo-tabela-amostra"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Botões de Ação do Modal -->
+        <div style="display:flex; justify-content:flex-end; gap:12px; border-top:1px solid #edf2f7; padding-top:14px;">
+          <button onclick="exportarEstudoExcel()" class="btn btn-success" style="padding:8px 16px; font-size:13px; font-weight:700;">📊 Exportar Este Estudo (.xlsx)</button>
+          <button onclick="fecharEIrParaTabela()" class="btn btn-primary" style="padding:8px 16px; font-size:13px; font-weight:700;">📋 Ver Todos os Casos na Tabela</button>
+        </div>
+
+      </div>
+    </div>
   </main>
 
   <script>
@@ -802,6 +870,180 @@
       if (elTop && elTop.value !== val) elTop.value = val;
       if (elFilter && elFilter.value !== val) elFilter.value = val;
       renderizarTabela();
+    }
+
+    let ultimosDadosEstudo = [];
+    let tituloEstudoAtual = '';
+
+    function abrirEstudoBalao(visaoKey) {
+      setVisaoGerencial(visaoKey);
+
+      const nomesVisoes = {
+        'todos': '📊 Estudo Geral: Todos os Lançamentos Auditados',
+        'desconto_sem_chamado': '🔴 Estudo Detalhado: Desconto sem Acareação',
+        'Procedente': '🟢 Estudo Detalhado: Desconto Confirmado (Procedente)',
+        'Não Procedente': '🛡️ Estudo Detalhado: Desconto Contestável (Não Procedente)',
+        'Não Enviado': '⚠️ Estudo Detalhado: Acareação Sem Desconto (Pendente de Envio)',
+        'custo_jm': '🏢 Estudo Detalhado: Custo JM (Perdas Absorvidas)',
+        'descontado_motorista': '💳 Estudo Detalhado: Descontado Motorista (Base Pagos)',
+        'Enviado para Desconto': '📤 Estudo Detalhado: Enviados para Desconto',
+        'efetivamente_descontado': '💳 Estudo Detalhado: Efetivamente Descontado pelo Financeiro',
+        'enviado_previa': '📤 Estudo Detalhado: Enviado na Prévia de Descontos',
+        'Em Análise': '⏳ Estudo Detalhado: Em Análise Operacional'
+      };
+
+      tituloEstudoAtual = nomesVisoes[visaoKey] || `🔍 Estudo Detalhado: ${visaoKey}`;
+      
+      const mesVal = (document.getElementById('select-filtro-mes-top')?.value || document.getElementById('filtro-mes')?.value || '');
+      const quinzenaVal = document.getElementById('filtro-quinzena')?.value || '';
+      const qTipoVal = document.getElementById('filtro-quinzena-tipo')?.value || '';
+
+      const registrosEstudo = todosRegistros.filter(r => {
+        let matchMes = true;
+        if (mesVal) matchMes = r.quinzena_code && r.quinzena_code.split('-')[1] === mesVal;
+
+        let matchQTipo = true;
+        if (qTipoVal) matchQTipo = r.quinzena_code && r.quinzena_code.endsWith(qTipoVal);
+
+        let matchQuinzena = true;
+        if (quinzenaVal) matchQuinzena = (r.quinzena_code === quinzenaVal);
+
+        let matchVisao = true;
+        if (visaoKey !== 'todos') {
+          if (visaoKey === 'desconto_sem_chamado') matchVisao = (r.status_triangulacao === 'Desconto sem Acareação');
+          else if (visaoKey === 'custo_jm') matchVisao = (r.responsabilidade_custo === 'Custo JM');
+          else if (visaoKey === 'descontado_motorista') matchVisao = (r.responsabilidade_custo === 'Descontado Motorista');
+          else if (visaoKey === 'efetivamente_descontado') matchVisao = (r.status_efetivacao === 'Efetivamente Descontado');
+          else if (visaoKey === 'enviado_previa') matchVisao = (r.status_efetivacao === 'Enviado p/ Desconto (Prévia)');
+          else if (visaoKey === 'Enviado para Desconto' || visaoKey === 'Não Enviado') matchVisao = (r.status_envio === visaoKey);
+          else matchVisao = (r.procedencia === visaoKey);
+        }
+        return matchMes && matchQTipo && matchQuinzena && matchVisao;
+      });
+
+      ultimosDadosEstudo = registrosEstudo;
+
+      const totalVal = registrosEstudo.reduce((acc, r) => acc + (r.valor_desconto_num || 0), 0);
+      const totalQtd = registrosEstudo.length;
+      const ticketMedio = totalQtd > 0 ? (totalVal / totalQtd) : 0;
+
+      const motoristasMap = {};
+      registrosEstudo.forEach(r => {
+        const mot = r.motorista || 'Não Informado';
+        if (!motoristasMap[mot]) motoristasMap[mot] = { val: 0, qtd: 0 };
+        motoristasMap[mot].val += (r.valor_desconto_num || 0);
+        motoristasMap[mot].qtd += 1;
+      });
+      const topMotoristas = Object.keys(motoristasMap)
+        .map(k => ({ mot: k, ...motoristasMap[k] }))
+        .sort((a, b) => b.val - a.val)
+        .slice(0, 5);
+
+      const regionaisMap = {};
+      registrosEstudo.forEach(r => {
+        const reg = r.regional || 'Outro';
+        if (!regionaisMap[reg]) regionaisMap[reg] = { val: 0, qtd: 0 };
+        regionaisMap[reg].val += (r.valor_desconto_num || 0);
+        regionaisMap[reg].qtd += 1;
+      });
+      const topRegionais = Object.keys(regionaisMap)
+        .map(k => ({ reg: k, ...regionaisMap[k] }))
+        .sort((a, b) => b.val - a.val)
+        .slice(0, 5);
+
+      setElementText('estudo-modal-titulo', tituloEstudoAtual);
+      setElementText('estudo-modal-subtitulo', `Estudo estatístico e analítico detalhado dos ${totalQtd} casos selecionados`);
+      setElementText('estudo-kpi-val', formatMoeda(totalVal));
+      setElementText('estudo-kpi-qtd', `${totalQtd} casos`);
+      setElementText('estudo-kpi-medio', formatMoeda(ticketMedio));
+
+      const divMot = document.getElementById('estudo-top-motoristas');
+      if (divMot) {
+        if (topMotoristas.length === 0) divMot.innerHTML = '<span style="color:var(--muted)">Sem registros.</span>';
+        else {
+          divMot.innerHTML = topMotoristas.map(m => `
+            <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+              <strong>${escapeHtml(m.mot)}</strong>
+              <span>${formatMoeda(m.val)} (${m.qtd} casos)</span>
+            </div>
+          `).join('');
+        }
+      }
+
+      const divReg = document.getElementById('estudo-top-regionais');
+      if (divReg) {
+        if (topRegionais.length === 0) divReg.innerHTML = '<span style="color:var(--muted)">Sem registros.</span>';
+        else {
+          divReg.innerHTML = topRegionais.map(r => `
+            <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e2e8f0;">
+              <strong>${escapeHtml(r.reg)}</strong>
+              <span>${formatMoeda(r.val)} (${r.qtd} casos)</span>
+            </div>
+          `).join('');
+        }
+      }
+
+      const tbodyAmostra = document.getElementById('estudo-tabela-amostra');
+      if (tbodyAmostra) {
+        tbodyAmostra.innerHTML = '';
+        registrosEstudo.slice(0, 10).forEach(item => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #edf2f7';
+          tr.innerHTML = `
+            <td style="padding:6px 12px; font-weight:bold; color:var(--accent);">${escapeHtml(item.pedido_id)}</td>
+            <td style="padding:6px 12px;">${escapeHtml(item.motorista)}</td>
+            <td style="padding:6px 12px;">${escapeHtml(item.regional)}</td>
+            <td style="padding:6px 12px; font-weight:bold; color:var(--text);">${escapeHtml(item.valor_desconto || formatMoeda(item.valor_desconto_num))}</td>
+            <td style="padding:6px 12px; font-size:11px; color:var(--muted);">${escapeHtml(item.origem_arquivo)}</td>
+          `;
+          tbodyAmostra.appendChild(tr);
+        });
+      }
+
+      const modal = document.getElementById('modal-estudo-balao');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function fecharModalEstudo() {
+      const modal = document.getElementById('modal-estudo-balao');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function fecharEIrParaTabela() {
+      fecharModalEstudo();
+      const el = document.getElementById('secao-tabela');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function exportarEstudoExcel() {
+      if (!ultimosDadosEstudo || ultimosDadosEstudo.length === 0) {
+        showToast('Nenhum dado disponível neste estudo para exportação.');
+        return;
+      }
+      const dataToExport = ultimosDadosEstudo.map(it => ({
+        "Pedido ID": it.pedido_id,
+        "Status Envio": it.status_envio,
+        "Status Efetivação": it.status_efetivacao,
+        "Responsabilidade Custo": it.responsabilidade_custo,
+        "Confronto Triplo": it.status_triangulacao,
+        "Quinzena": it.quinzena_label,
+        "Motorista": it.motorista,
+        "Regional": it.regional,
+        "Rota": it.rota,
+        "Placa": it.placa,
+        "Valor Desconto": it.valor_desconto_num,
+        "Procedência Chamado": it.procedencia,
+        "Origem Planilha": it.origem_arquivo,
+        "Operação": it.operacao,
+        "Motivo": it.motivo
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Estudo_Auditado");
+      const fname = `Estudo_Financeiro_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fname);
+      showToast(`Estudo exportado com sucesso (${ultimosDadosEstudo.length} registros)!`);
     }
 
     function setVisaoGerencial(visaoKey) {
