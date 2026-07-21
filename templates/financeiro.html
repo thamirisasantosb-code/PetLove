@@ -1052,7 +1052,10 @@
 
       if (filtrados.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="13" style="text-align:center; color:var(--muted); padding:30px; font-weight:bold;">Nenhum registro encontrado para os filtros e visão selecionados.</td>`;
+        const optMes = mesVal ? document.querySelector(`#filtro-mes option[value="${mesVal}"]`) : null;
+        const nomeMes = optMes ? optMes.textContent.replace('📅 Mês (', '').replace(')', '').trim() : '';
+        const msgDica = mesVal ? `<br><span style="font-size:12px; color:var(--muted); font-weight:normal; margin-top:6px; display:inline-block;">💡 Dica: Selecione <strong>"📅 Mês (Todos os Meses)"</strong> ou altere para <strong>Julho, Maio ou Abril</strong> para visualizar os lançamentos.</span>` : '';
+        tr.innerHTML = `<td colspan="13" style="text-align:center; color:var(--muted); padding:30px; font-weight:bold;">⚠️ Nenhum registro encontrado para ${nomeMes ? `o mês de ${nomeMes}` : 'os filtros selecionados'}.${msgDica}</td>`;
         tbody.appendChild(tr);
         return;
       }
