@@ -227,20 +227,43 @@
       <button class="tab-btn" id="tab-tabela" onclick="alternarModoExibicao('tabela')">📋 Relação de Lançamentos & Auditoria</button>
     </div>
 
-    <!-- Visões Gerenciais (Dropdown Lista Suspensa sem Ícones) -->
-    <div class="manager-views-bar" style="display:flex; align-items:center; gap:12px; margin-bottom:20px; background:#fff; padding:12px 20px; border-radius:12px; border:1px solid var(--line); box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-      <label for="select-visao-gerencial" style="font-size:13px; font-weight:700; color:var(--accent); white-space:nowrap;">Visões gerenciais:</label>
-      <select id="select-visao-gerencial" style="padding:8px 14px; border-radius:8px; border:1px solid #cbd5e0; font-size:13px; font-weight:600; color:var(--text); background:#fff; cursor:pointer; min-width:260px;" onchange="setVisaoGerencial(this.value)">
-        <option value="todos">Visão geral (todos)</option>
-        <option value="Enviado para Desconto">Enviados p/ desconto</option>
-        <option value="Não Enviado">Pendentes de envio (não enviados)</option>
-        <option value="Procedente">Perdas confirmadas (procedentes)</option>
-        <option value="Não Procedente">Contestados / estornos</option>
-        <option value="Em Análise">Em análise</option>
-        <option value="desconto_sem_chamado">Descontos sem acareação</option>
-        <option value="custo_jm">Custo JM (não descontado do motorista)</option>
-        <option value="descontado_motorista">Descontado motorista (consta em Base Pagos)</option>
-      </select>
+    <!-- Visões Gerenciais & Filtro de Mês (Dropdowns lado a lado) -->
+    <div class="manager-views-bar" style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:20px; background:#fff; padding:12px 20px; border-radius:12px; border:1px solid var(--line); box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+      
+      <div style="display:flex; align-items:center; gap:10px;">
+        <label for="select-visao-gerencial" style="font-size:13px; font-weight:700; color:var(--accent); white-space:nowrap;">Visões gerenciais:</label>
+        <select id="select-visao-gerencial" style="padding:8px 14px; border-radius:8px; border:1px solid #cbd5e0; font-size:13px; font-weight:600; color:var(--text); background:#fff; cursor:pointer; min-width:240px;" onchange="setVisaoGerencial(this.value)">
+          <option value="todos">Visão geral (todos)</option>
+          <option value="Enviado para Desconto">Enviados p/ desconto</option>
+          <option value="Não Enviado">Pendentes de envio (não enviados)</option>
+          <option value="Procedente">Perdas confirmadas (procedentes)</option>
+          <option value="Não Procedente">Contestados / estornos</option>
+          <option value="Em Análise">Em análise</option>
+          <option value="desconto_sem_chamado">Descontos sem acareação</option>
+          <option value="custo_jm">Custo JM (não descontado do motorista)</option>
+          <option value="descontado_motorista">Descontado motorista (consta em Base Pagos)</option>
+        </select>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px;">
+        <label for="select-filtro-mes-top" style="font-size:13px; font-weight:700; color:var(--accent); white-space:nowrap;">Filtrar por mês:</label>
+        <select id="select-filtro-mes-top" style="padding:8px 14px; border-radius:8px; border:1px solid #cbd5e0; font-size:13px; font-weight:600; color:var(--text); background:#fff; cursor:pointer; min-width:180px;" onchange="sincronizarFiltroMes(this.value)">
+          <option value="">Mês (todos)</option>
+          <option value="01">Janeiro</option>
+          <option value="02">Fevereiro</option>
+          <option value="03">Março</option>
+          <option value="04">Abril</option>
+          <option value="05">Maio</option>
+          <option value="06">Junho</option>
+          <option value="07">Julho</option>
+          <option value="08">Agosto</option>
+          <option value="09">Setembro</option>
+          <option value="10">Outubro</option>
+          <option value="11">Novembro</option>
+          <option value="12">Dezembro</option>
+        </select>
+      </div>
+
     </div>
 
     <!-- Cards de Estatísticas Financeiras -->
@@ -394,13 +417,6 @@
         <div class="barometer-title">📅 3. Resumo por Quinzena (Volume R$ e Qtd)</div>
         <div class="barometer-subtitle">Evolução dos descontos e acareações divididos por períodos quinzenais</div>
         <div class="quinzena-grid" id="barometro-quinzenas-container"></div>
-      </div>
-
-      <!-- Card Barômetro 4: Top Regionais por Risco Financeiro -->
-      <div class="barometer-card full-width">
-        <div class="barometer-title">🗺️ 4. Concentração Financeira por Polo Regional</div>
-        <div class="barometer-subtitle">Ranking de impacto financeiro (R$) e volume de ocorrências nas filiais regionais</div>
-        <div class="regional-list" id="barometro-regionais-container"></div>
       </div>
     </div>
 
@@ -775,6 +791,14 @@
       });
     }
 
+    function sincronizarFiltroMes(val) {
+      const elTop = document.getElementById('select-filtro-mes-top');
+      const elFilter = document.getElementById('filtro-mes');
+      if (elTop && elTop.value !== val) elTop.value = val;
+      if (elFilter && elFilter.value !== val) elFilter.value = val;
+      renderizarTabela();
+    }
+
     function setVisaoGerencial(visaoKey) {
       visaoGerencialAtiva = visaoKey;
       const sel = document.getElementById('select-visao-gerencial');
@@ -788,7 +812,9 @@
 
       const buscaVal = document.getElementById('filtro-busca').value.toLowerCase().trim();
       const quinzenaVal = document.getElementById('filtro-quinzena').value;
-      const mesVal = document.getElementById('filtro-mes') ? document.getElementById('filtro-mes').value : '';
+      const topMes = document.getElementById('select-filtro-mes-top') ? document.getElementById('select-filtro-mes-top').value : '';
+      const filterMes = document.getElementById('filtro-mes') ? document.getElementById('filtro-mes').value : '';
+      const mesVal = topMes || filterMes;
       const qTipoVal = document.getElementById('filtro-quinzena-tipo') ? document.getElementById('filtro-quinzena-tipo').value : '';
       const statusEnvioVal = document.getElementById('filtro-status-envio').value;
       const procVal = document.getElementById('filtro-procedencia').value;
@@ -909,6 +935,7 @@
 
     function limparFiltros() {
       document.getElementById('filtro-busca').value = '';
+      if (document.getElementById('select-filtro-mes-top')) document.getElementById('select-filtro-mes-top').value = '';
       if (document.getElementById('filtro-mes')) document.getElementById('filtro-mes').value = '';
       if (document.getElementById('filtro-quinzena-tipo')) document.getElementById('filtro-quinzena-tipo').value = '';
       document.getElementById('filtro-quinzena').value = '';
