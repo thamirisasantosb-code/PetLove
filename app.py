@@ -2305,13 +2305,23 @@ def api_financeiro_dados():
             if is_pagos_file and status_envio == "Enviado para Desconto":
                 status_efetivacao = "Efetivamente Descontado"
                 badge_efetivacao = "💳 Efetivamente Descontado"
-                responsabilidade_custo = "Descontado Motorista"
-                badge_custo = "🟢 Descontado Motorista"
+                responsabilidade_custo = "Descontado do Motorista"
+                badge_custo = "💳 Descontado do Motorista"
             elif status_envio == "Enviado para Desconto":
                 status_efetivacao = "Enviado p/ Desconto (Prévia)"
                 badge_efetivacao = "📤 Enviado p/ Desconto"
                 responsabilidade_custo = "Custo JM"
-                badge_custo = "🏢 Custo JM"
+                badge_custo = "🏢 Custo JM (Empresa)"
+            elif proc_norm == "Não Procedente":
+                status_efetivacao = "Contestado"
+                badge_efetivacao = "🛡️ Não Cobrado"
+                responsabilidade_custo = "Não Cobrado"
+                badge_custo = "🛡️ Não Cobrado (Improcedente)"
+            elif proc_norm == "Procedente":
+                status_efetivacao = "Procedente Sem Desconto"
+                badge_efetivacao = "🏢 Custo JM"
+                responsabilidade_custo = "Custo JM"
+                badge_custo = "🏢 Custo JM (Sem Desconto)"
             else:
                 status_efetivacao = "Pendente de Envio"
                 badge_efetivacao = "⚠️ Pendente de Envio"

@@ -947,6 +947,14 @@
           <option value="Não Cadastrado">Sem Chamado no Fluxo</option>
         </select>
 
+        <select id="filtro-custo" onchange="renderizarTabela()">
+          <option value="">Destino do Custo (Todos)</option>
+          <option value="Descontado do Motorista">💳 Descontado do Motorista</option>
+          <option value="Custo JM">🏢 Custo JM (Empresa)</option>
+          <option value="Não Cobrado">🛡️ Não Cobrado (Isento)</option>
+          <option value="Pendente Financeiro">⏳ Pendente Financeiro</option>
+        </select>
+
         <select id="filtro-origem">
           <option value="">Origem / Planilha (Todas)</option>
         </select>
@@ -961,9 +969,10 @@
           <thead>
             <tr>
               <th style="width: 110px;">ID Pedido</th>
-              <th style="width: 170px;">Cruzamento 3 Bases</th>
-              <th style="width: 140px;">Status Envio</th>
-              <th style="width: 160px;">Mês / Quinzena</th>
+              <th style="width: 175px;">Destino do Custo (Quem Paga)</th>
+              <th style="width: 165px;">Cruzamento 3 Bases</th>
+              <th style="width: 130px;">Status Envio</th>
+              <th style="width: 140px;">Mês / Quinzena</th>
               <th style="width: 150px;">Planilha de Origem</th>
               <th>Motorista</th>
               <th style="width: 90px;">Regional</th>
@@ -1485,10 +1494,11 @@
       const statusEnvioVal = document.getElementById('filtro-status-envio').value;
       const procVal = document.getElementById('filtro-procedencia').value;
       const statusFluxoVal = document.getElementById('filtro-status-fluxo').value;
+      const custoVal = document.getElementById('filtro-custo') ? document.getElementById('filtro-custo').value : '';
       const origemVal = document.getElementById('filtro-origem').value;
 
       const filtrados = todosRegistros.filter(r => {
-        const textFull = `${r.pedido_id} ${r.motorista} ${r.regional} ${r.rota} ${r.placa} ${r.origem_arquivo} ${r.responsavel} ${r.status_envio}`.toLowerCase();
+        const textFull = `${r.pedido_id} ${r.motorista} ${r.regional} ${r.rota} ${r.placa} ${r.origem_arquivo} ${r.responsavel} ${r.status_envio} ${r.responsabilidade_custo}`.toLowerCase();
         const matchBusca = !buscaVal || textFull.includes(buscaVal);
         
         let matchMes = true;
@@ -1511,6 +1521,9 @@
         if (statusFluxoVal === 'Cadastrado') matchStatusFluxo = r.tem_chamado;
         else if (statusFluxoVal === 'Não Cadastrado') matchStatusFluxo = !r.tem_chamado;
 
+        let matchCusto = true;
+        if (custoVal) matchCusto = (r.responsabilidade_custo === custoVal);
+
         let matchOrigem = true;
         if (origemVal) matchOrigem = (r.origem_arquivo === origemVal);
 
@@ -1525,7 +1538,7 @@
           } else if (visaoGerencialAtiva === 'custo_jm') {
             matchVisao = (r.responsabilidade_custo === 'Custo JM');
           } else if (visaoGerencialAtiva === 'descontado_motorista') {
-            matchVisao = (r.responsabilidade_custo === 'Descontado Motorista');
+            matchVisao = (r.responsabilidade_custo === 'Descontado do Motorista' || r.responsabilidade_custo === 'Descontado Motorista');
           } else if (visaoGerencialAtiva === 'Enviado para Desconto' || visaoGerencialAtiva === 'Não Enviado') {
             matchVisao = (r.status_envio === visaoGerencialAtiva);
           } else {
@@ -1533,7 +1546,7 @@
           }
         }
 
-        return matchBusca && matchMes && matchQTipo && matchStatusEnvio && matchProc && matchStatusFluxo && matchOrigem && matchVisao;
+        return matchBusca && matchMes && matchQTipo && matchStatusEnvio && matchProc && matchStatusFluxo && matchCusto && matchOrigem && matchVisao;
       });
 
       atualizarBarometro(filtrados);
@@ -1543,7 +1556,7 @@
         const optMes = mesVal ? document.querySelector(`#filtro-mes option[value="${mesVal}"]`) : null;
         const nomeMes = optMes ? optMes.textContent.replace('📅 Mês (', '').replace(')', '').trim() : '';
         const msgDica = mesVal ? `<br><span style="font-size:12px; color:var(--text-muted); font-weight:normal; margin-top:6px; display:inline-block;">💡 Dica: Selecione <strong>"📅 Mês (Todos os Meses)"</strong> ou altere para <strong>Julho, Maio ou Abril</strong> para visualizar os lançamentos.</span>` : '';
-        tr.innerHTML = `<td colspan="13" style="text-align:center; color:var(--text-muted); padding:36px; font-weight:bold;">⚠️ Nenhum registro encontrado para ${nomeMes ? `o mês de ${nomeMes}` : 'os filtros selecionados'}.${msgDica}</td>`;
+        tr.innerHTML = `<td colspan="14" style="text-align:center; color:var(--text-muted); padding:36px; font-weight:bold;">⚠️ Nenhum registro encontrado para ${nomeMes ? `o mês de ${nomeMes}` : 'os filtros selecionados'}.${msgDica}</td>`;
         tbody.appendChild(tr);
         return;
       }
@@ -1561,6 +1574,18 @@
         const statusEnvioBadge = isEnviado
           ? `<span class="badge" style="background:#f3e8ff; color:#6b21a8; border:1px solid #e9d5ff;">🟢 Enviado</span>`
           : `<span class="badge" style="background:#fffbeb; color:#92400e; border:1px solid #fde68a;">⚠️ NÃO Enviado</span>`;
+
+        let badgeCustoHtml = '';
+        const respCusto = item.responsabilidade_custo || '';
+        if (respCusto === 'Descontado do Motorista' || respCusto === 'Descontado Motorista') {
+          badgeCustoHtml = `<span class="badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:12px; padding:6px 12px; font-weight:800;">💳 Descontado do Motorista</span>`;
+        } else if (respCusto === 'Custo JM') {
+          badgeCustoHtml = `<span class="badge" style="background:#f3e8ff; color:#6b21a8; border:1px solid #e9d5ff; font-size:12px; padding:6px 12px; font-weight:800;">🏢 Custo JM (Empresa)</span>`;
+        } else if (respCusto === 'Não Cobrado') {
+          badgeCustoHtml = `<span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:12px; padding:6px 12px; font-weight:800;">🛡️ Não Cobrado (Isento)</span>`;
+        } else {
+          badgeCustoHtml = `<span class="badge" style="background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:12px; padding:6px 12px; font-weight:800;">⏳ Pendente Financeiro</span>`;
+        }
 
         const statusFluxoBadge = item.tem_chamado 
           ? `<span class="badge badge-cadastrado">🟢 Cadastrado</span>`
@@ -1585,6 +1610,7 @@
 
         tr.innerHTML = `
           <td style="font-weight:800; color:var(--accent);">${escapeHtml(item.pedido_id)}</td>
+          <td>${badgeCustoHtml}</td>
           <td><span style="font-size:12px; font-weight:700;">${escapeHtml(item.badge_triangulacao || '')}</span></td>
           <td>${statusEnvioBadge}</td>
           <td style="font-size:12.5px; font-weight:700; color:var(--text-main);">${escapeHtml(quinzenaDisplay)}</td>
@@ -1606,6 +1632,7 @@
       document.getElementById('filtro-busca').value = '';
       if (document.getElementById('filtro-mes')) document.getElementById('filtro-mes').value = '';
       if (document.getElementById('filtro-quinzena-tipo')) document.getElementById('filtro-quinzena-tipo').value = '';
+      if (document.getElementById('filtro-custo')) document.getElementById('filtro-custo').value = '';
       document.getElementById('filtro-status-envio').value = '';
       document.getElementById('filtro-procedencia').value = '';
       document.getElementById('filtro-status-fluxo').value = '';
@@ -1613,7 +1640,7 @@
       setVisaoGerencial('todos');
     }
 
-    ['filtro-mes', 'filtro-quinzena-tipo', 'filtro-status-envio', 'filtro-procedencia', 'filtro-status-fluxo', 'filtro-origem'].forEach(id => {
+    ['filtro-mes', 'filtro-quinzena-tipo', 'filtro-status-envio', 'filtro-procedencia', 'filtro-status-fluxo', 'filtro-custo', 'filtro-origem'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', renderizarTabela);
     });
 
