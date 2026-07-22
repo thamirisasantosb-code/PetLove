@@ -12,7 +12,7 @@ fi
 # Sempre atualiza a Base de dados no volume persistente com os arquivos mais recentes do build
 echo "Sincronizando arquivos da Base de dados..."
 mkdir -p "/app/data/Base de dados"
-cp -r "/app/defaults/Base de dados/"* "/app/data/Base de dados/"
+cp -rf "/app/defaults/Base de dados/"* "/app/data/Base de dados/"
 
 # Executa a sincronizacao segura do banco de dados SQLite
 echo "Executando migracao/sincronizacao do banco de dados..."

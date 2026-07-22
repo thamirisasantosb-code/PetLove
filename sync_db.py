@@ -315,5 +315,57 @@ def sync_db():
         print(f" - Chamados pendentes atualizados: {atualizados}")
         print(f" - Chamados tratados preservados (não alterados): {pula_tratados}")
 
+def sync_usuarios():
+    repo_usuarios_path = Path(__file__).parent / "Base de dados" / "usuarios.csv"
+    base_dados_dir = Path(os.getenv("BASE_DADOS_DIR", Path(__file__).parent / "Base de dados"))
+    target_usuarios_path = base_dados_dir / "usuarios.csv"
+
+    def read_csv_users(path):
+        users = {}
+        if not path.exists():
+            return users
+        for enc in ('utf-8-sig', 'utf-8', 'latin-1'):
+            try:
+                with open(path, newline='', encoding=enc, errors='ignore') as f:
+                    leitor = csv.DictReader(f)
+                    for row in leitor:
+                        row_clean = {}
+                        for k, v in row.items():
+                            if k:
+                                row_clean[k.strip().lstrip('\ufeff')] = str(v).strip() if v else ""
+                        email = (row_clean.get("Email") or row_clean.get("email") or "").lower()
+                        if email:
+                            users[email] = {
+                                "Email": email,
+                                "Senha": row_clean.get("Senha") or row_clean.get("senha") or "",
+                                "Perfil": row_clean.get("Perfil") or row_clean.get("perfil") or "Usuario",
+                                "Nome": row_clean.get("Nome") or row_clean.get("nome") or ""
+                            }
+                break
+            except Exception:
+                continue
+        return users
+
+    repo_users = read_csv_users(repo_usuarios_path)
+    target_users = read_csv_users(target_usuarios_path) if target_usuarios_path.resolve() != repo_usuarios_path.resolve() else {}
+
+    merged_users = {}
+    for email, data in target_users.items():
+        merged_users[email] = data
+    for email, data in repo_users.items():
+        merged_users[email] = data
+
+    if merged_users:
+        campos = ["Email", "Senha", "Perfil", "Nome"]
+        target_usuarios_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_usuarios_path, mode='w', newline='', encoding='utf-8') as f:
+            escritor = csv.DictWriter(f, fieldnames=campos, extrasaction='ignore')
+            escritor.writeheader()
+            for user in merged_users.values():
+                escritor.writerow(user)
+        print(f"Sincronização de usuários: {len(merged_users)} usuários salvos em {target_usuarios_path}")
+
 if __name__ == "__main__":
+    sync_usuarios()
     sync_db()
+
