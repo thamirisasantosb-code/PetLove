@@ -905,6 +905,10 @@
 
       <!-- Filtros Secundários -->
       <div class="filters-container">
+        <select id="filtro-ano" onchange="renderizarTabela()">
+          <option value="">📅 Ano (Todos)</option>
+        </select>
+
         <select id="filtro-mes" onchange="renderizarTabela()">
           <option value="">📅 Mês (Todos os Meses)</option>
           <option value="01">Janeiro</option>
@@ -1118,6 +1122,7 @@
         periodosDados = data.periodos || [];
 
         atualizarKPIs();
+        popularFiltroAnos();
         popularFiltroQuinzenas();
         popularFiltroOrigens();
         renderizarTabela();
@@ -1128,6 +1133,38 @@
         statusDiv.textContent = '❌ ' + err.message;
         statusDiv.style.color = 'var(--secondary)';
       }
+    }
+
+    function popularFiltroAnos() {
+      const select = document.getElementById('filtro-ano');
+      if (!select) return;
+      
+      const anosSet = new Set();
+      todosRegistros.forEach(r => {
+        let ano = '';
+        if (r.quinzena_code) ano = r.quinzena_code.split('-')[0];
+        if (!ano || ano.length !== 4) {
+          const dt = r.data_reclamacao || r.data_carregamento || '';
+          if (dt.includes('/')) {
+            const parts = dt.split('/');
+            if (parts.length >= 3 && parts[2].length >= 4) ano = parts[2].slice(0, 4);
+          } else if (dt.includes('-')) {
+            ano = dt.split('-')[0];
+          }
+        }
+        if (ano && ano.length === 4 && !isNaN(ano)) anosSet.add(ano);
+      });
+
+      const anos = Array.from(anosSet).sort().reverse();
+      const valAtual = select.value;
+      select.innerHTML = '<option value="">📅 Ano (Todos)</option>';
+      anos.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a;
+        opt.textContent = `📅 ${a}`;
+        select.appendChild(opt);
+      });
+      if (valAtual && anos.includes(valAtual)) select.value = valAtual;
     }
 
     function atualizarKPIs() {
@@ -1489,6 +1526,7 @@
       tbody.innerHTML = '';
 
       const buscaVal = document.getElementById('filtro-busca').value.toLowerCase().trim();
+      const anoVal = document.getElementById('filtro-ano') ? document.getElementById('filtro-ano').value : '';
       const mesVal = document.getElementById('filtro-mes') ? document.getElementById('filtro-mes').value : '';
       const qTipoVal = document.getElementById('filtro-quinzena-tipo') ? document.getElementById('filtro-quinzena-tipo').value : '';
       const statusEnvioVal = document.getElementById('filtro-status-envio').value;
@@ -1501,6 +1539,21 @@
         const textFull = `${r.pedido_id} ${r.motorista} ${r.regional} ${r.rota} ${r.placa} ${r.origem_arquivo} ${r.responsavel} ${r.status_envio} ${r.responsabilidade_custo}`.toLowerCase();
         const matchBusca = !buscaVal || textFull.includes(buscaVal);
         
+        let matchAno = true;
+        if (anoVal) {
+          let rAno = r.quinzena_code ? r.quinzena_code.split('-')[0] : '';
+          if (!rAno || rAno.length !== 4) {
+            const dt = r.data_reclamacao || r.data_carregamento || '';
+            if (dt.includes('/')) {
+              const parts = dt.split('/');
+              if (parts.length >= 3) rAno = parts[2].slice(0, 4);
+            } else if (dt.includes('-')) {
+              rAno = dt.split('-')[0];
+            }
+          }
+          matchAno = (rAno === anoVal);
+        }
+
         let matchMes = true;
         if (mesVal) {
           matchMes = r.quinzena_code && r.quinzena_code.split('-')[1] === mesVal;
@@ -1546,7 +1599,7 @@
           }
         }
 
-        return matchBusca && matchMes && matchQTipo && matchStatusEnvio && matchProc && matchStatusFluxo && matchCusto && matchOrigem && matchVisao;
+        return matchBusca && matchAno && matchMes && matchQTipo && matchStatusEnvio && matchProc && matchStatusFluxo && matchCusto && matchOrigem && matchVisao;
       });
 
       atualizarBarometro(filtrados);
@@ -1555,7 +1608,7 @@
         const tr = document.createElement('tr');
         const optMes = mesVal ? document.querySelector(`#filtro-mes option[value="${mesVal}"]`) : null;
         const nomeMes = optMes ? optMes.textContent.replace('📅 Mês (', '').replace(')', '').trim() : '';
-        const msgDica = mesVal ? `<br><span style="font-size:12px; color:var(--text-muted); font-weight:normal; margin-top:6px; display:inline-block;">💡 Dica: Selecione <strong>"📅 Mês (Todos os Meses)"</strong> ou altere para <strong>Julho, Maio ou Abril</strong> para visualizar os lançamentos.</span>` : '';
+        const msgDica = (mesVal || anoVal) ? `<br><span style="font-size:12px; color:var(--text-muted); font-weight:normal; margin-top:6px; display:inline-block;">💡 Dica: Ajuste os filtros de <strong>Ano e Mês</strong> para visualizar os lançamentos desejados.</span>` : '';
         tr.innerHTML = `<td colspan="14" style="text-align:center; color:var(--text-muted); padding:36px; font-weight:bold;">⚠️ Nenhum registro encontrado para ${nomeMes ? `o mês de ${nomeMes}` : 'os filtros selecionados'}.${msgDica}</td>`;
         tbody.appendChild(tr);
         return;
@@ -1630,6 +1683,7 @@
 
     function limparFiltros() {
       document.getElementById('filtro-busca').value = '';
+      if (document.getElementById('filtro-ano')) document.getElementById('filtro-ano').value = '';
       if (document.getElementById('filtro-mes')) document.getElementById('filtro-mes').value = '';
       if (document.getElementById('filtro-quinzena-tipo')) document.getElementById('filtro-quinzena-tipo').value = '';
       if (document.getElementById('filtro-custo')) document.getElementById('filtro-custo').value = '';
@@ -1640,7 +1694,7 @@
       setVisaoGerencial('todos');
     }
 
-    ['filtro-mes', 'filtro-quinzena-tipo', 'filtro-status-envio', 'filtro-procedencia', 'filtro-status-fluxo', 'filtro-custo', 'filtro-origem'].forEach(id => {
+    ['filtro-ano', 'filtro-mes', 'filtro-quinzena-tipo', 'filtro-status-envio', 'filtro-procedencia', 'filtro-status-fluxo', 'filtro-custo', 'filtro-origem'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', renderizarTabela);
     });
 
