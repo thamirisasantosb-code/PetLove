@@ -16,6 +16,8 @@ BASE_DADOS_DIR = Path(os.getenv("BASE_DADOS_DIR", Path(__file__).parent / "Base 
 DB_PATH = Path(os.getenv("DATABASE_PATH", Path(__file__).parent / "petlove.db"))
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.jinja_env.auto_reload = True
 app.secret_key = os.getenv("SECRET_KEY", "petlove_jm_secret_key_2026_fixed_session_key")
 app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=30)
 
