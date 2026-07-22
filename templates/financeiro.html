@@ -964,6 +964,7 @@
         </select>
 
         <button id="btn-limpar-filtros" class="btn-limpar" onclick="limparFiltros()">🧹 Limpar Filtros</button>
+        <button class="btn btn-success" style="padding:10px 16px; border-radius:10px; font-size:13px; font-weight:800;" onclick="exportarRelatorioExcel()">📊 Exportar Filtrados (.xlsx)</button>
       </div>
 
       <div id="status-global">Buscando lançamentos financeiros...</div>
@@ -1064,6 +1065,7 @@
 
   <script>
     let todosRegistros = [];
+    let ultimosRegistrosFiltrados = [];
     let resumoDados = {};
     let periodosDados = [];
     let visaoGerencialAtiva = 'todos';
@@ -1603,6 +1605,7 @@
       });
 
       atualizarBarometro(filtrados);
+      ultimosRegistrosFiltrados = filtrados;
 
       if (filtrados.length === 0) {
         const tr = document.createElement('tr');
@@ -1751,32 +1754,43 @@
     }
 
     function exportarRelatorioExcel() {
-      if (todosRegistros.length === 0) {
-        showToast('Nenhum dado para exportar.', true);
+      const listToExport = (ultimosRegistrosFiltrados && ultimosRegistrosFiltrados.length > 0) ? ultimosRegistrosFiltrados : todosRegistros;
+      
+      if (listToExport.length === 0) {
+        showToast('Nenhum dado filtrado disponível para exportação.', true);
         return;
       }
 
-      const exportData = todosRegistros.map(r => ({
+      const exportData = listToExport.map(r => ({
         "ID Pedido": r.pedido_id,
-        "Origem / Planilha": r.origem_arquivo,
-        "Motorista": r.motorista,
-        "Regional": r.regional,
-        "Rota": r.rota,
-        "Placa": r.placa,
-        "Valor Desconto": r.valor_desconto,
-        "Status no Fluxo": r.status_chamado,
-        "Procedência do Caso": r.procedencia,
-        "Responsável Análise": r.responsavel,
-        "Criado Por": r.criado_por,
-        "Justificativa": r.justificativa,
-        "Tratativa": r.tratativa,
-        "Data Importação": r.data_importacao
+        "Data Reclamação": r.data_reclamacao || "",
+        "Data Carregamento": r.data_carregamento || "",
+        "Destino do Custo (Quem Paga)": r.responsabilidade_custo || "",
+        "Cruzamento 3 Bases": r.status_triangulacao || "",
+        "Status Envio": r.status_envio || "",
+        "Status Efetivação": r.status_efetivacao || "",
+        "Quinzena / Mês": r.quinzena_label || "",
+        "Planilha de Origem": r.origem_arquivo || "",
+        "Motorista": r.motorista || "",
+        "Regional": r.regional || "",
+        "Rota": r.rota || "",
+        "Placa": r.placa || "",
+        "Valor Desconto R$": r.valor_desconto_num || 0,
+        "Status no Fluxo": r.status_chamado || "",
+        "Procedência Chamado": r.procedencia || "",
+        "Responsável Análise": r.responsavel || "",
+        "Criado Por": r.criado_por || "",
+        "Justificativa": r.justificativa || "",
+        "Tratativa": r.tratativa || "",
+        "Data Importação": r.data_importacao || ""
       }));
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Financeiro Descontos");
-      XLSX.writeFile(wb, `Relatorio_Financeiro_Descontos_Petlove_${Date.now()}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, ws, "Financeiro_Filtrado");
+      const fname = `Relatorio_Financeiro_Filtrado_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, fname);
+      showToast(`✅ Exportado com sucesso: ${listToExport.length} registros filtrados!`);
     }
 
     function escapeHtml(v) {
