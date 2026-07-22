@@ -1972,7 +1972,7 @@ def sincronizar_descontos_base():
             filename = filepath.name
             try:
                 wb = openpyxl.load_workbook(filepath, data_only=True)
-                sheet_names = [s for s in wb.sheetnames if any(w in s.lower() for w in ['petlove', 'pet love', 'desconto', 'extravio', 'perda', 'acareação', 'acareacao'])]
+                sheet_names = [s for s in wb.sheetnames if any(w in s.lower() for w in ['petlove', 'pet love', 'desconto', 'extravio', 'perda', 'acareação', 'acareacao', 'pago', 'pagos', 'base pagos'])]
                 if not sheet_names and len(wb.sheetnames) == 1:
                     sheet_names = wb.sheetnames
                     
@@ -2014,6 +2014,8 @@ def sincronizar_descontos_base():
                         valor = ''
                         operacao = ''
                         motivo = ''
+                        val_explicit_desconto = None
+                        val_generic = None
                         
                         for k, v in d_row.items():
                             if v is None: continue
@@ -2028,9 +2030,22 @@ def sincronizar_descontos_base():
                             elif 'regional' in k_lower or 'filial' in k_lower: regional = v_str
                             elif 'rota' in k_lower: rota = v_str
                             elif 'placa' in k_lower: placa = v_str
-                            elif 'valor' in k_lower or 'perda' in k_lower: valor = v_str
+                            elif 'valor' in k_lower and ('desconto' in k_lower or 'descontado' in k_lower): val_explicit_desconto = v_str
+                            elif 'valor' in k_lower or 'perda' in k_lower: val_generic = v_str
                             elif 'opera' in k_lower or 'cliente' in k_lower or 'conta' in k_lower: operacao = v_str
                             elif 'motivo' in k_lower: motivo = v_str
+
+                        # Prioridade 1: valor da coluna VALOR DESCONTO / VALOR dESCONTO (Coluna S)
+                        # Prioridade 2: valor direto da Coluna S (índice 18 na linha)
+                        # Prioridade 3: valor genérico
+                        valor = val_explicit_desconto
+                        if not valor and len(r) > 18 and r[18] is not None and str(r[18]).strip() != '':
+                            col_s_val = str(r[18]).strip()
+                            if any(c.isdigit() for c in col_s_val):
+                                valor = col_s_val
+
+                        if not valor:
+                            valor = val_generic or ''
 
                         # Regra 1: Filtro de Operação (Manter apenas PETLOVE - LAST MILE)
                         if operacao:
