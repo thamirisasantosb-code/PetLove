@@ -571,25 +571,30 @@ def api_listar_usuarios():
         return jsonify([])
         
     usuarios = []
-    with open(csv_path, newline='', encoding='utf-8-sig', errors='ignore') as f:
-        leitor = csv.DictReader(f)
-        for row in leitor:
-            row_clean = {}
-            for k, v in row.items():
-                if k:
-                    k_clean = k.strip().lstrip('\ufeff')
-                    row_clean[k_clean] = str(v).strip() if v else ""
-            
-            row_email = row_clean.get("Email") or row_clean.get("email") or ""
-            if not row_email:
-                continue
-                
-            usuarios.append({
-                "Email": row_email,
-                "Nome": row_clean.get("Nome") or row_clean.get("nome") or "",
-                "Perfil": row_clean.get("Perfil") or row_clean.get("perfil") or "Usuario",
-                "Senha": row_clean.get("Senha") or row_clean.get("senha") or ""
-            })
+    for encoding in ('utf-8-sig', 'utf-8', 'latin-1'):
+        try:
+            with open(csv_path, newline='', encoding=encoding, errors='ignore') as f:
+                leitor = csv.DictReader(f)
+                for row in leitor:
+                    row_clean = {}
+                    for k, v in row.items():
+                        if k:
+                            k_clean = k.strip().lstrip('\ufeff')
+                            row_clean[k_clean] = str(v).strip() if v else ""
+                    
+                    row_email = row_clean.get("Email") or row_clean.get("email") or ""
+                    if not row_email:
+                        continue
+                        
+                    usuarios.append({
+                        "Email": row_email,
+                        "Nome": row_clean.get("Nome") or row_clean.get("nome") or "",
+                        "Perfil": row_clean.get("Perfil") or row_clean.get("perfil") or "Usuario",
+                        "Senha": row_clean.get("Senha") or row_clean.get("senha") or ""
+                    })
+            break
+        except Exception:
+            continue
     return jsonify(usuarios)
 
 @app.route("/api/usuarios/salvar", methods=["POST"])
@@ -768,7 +773,7 @@ def sincronizar_pasta_tms():
                 
         chamados_existentes[str(d.get(key_map.get("id", col_id_db), "")).strip()] = (d, key_map)
         
-    total_atualizados = 0
+    total_novos = 0
     total_lidos = 0
     
     for csv_file in csv_files:
@@ -788,12 +793,9 @@ def sincronizar_pasta_tms():
                 col_pedido = next((c for c in leitor.fieldnames if 'Pedido' in c), 'Pedido')
                 pedido_id = str(row.get(col_pedido, "")).strip()
                 
-                if not pedido_id or pedido_id not in chamados_existentes:
+                if not pedido_id:
                     continue
                     
-                # O pedido existe na base! Vamos atualizar campos que estiverem em branco.
-                chamado_dict, key_map = chamados_existentes[pedido_id]
-                
                 # Preparar valores do TMS
                 data_carr_raw = row.get("Data_do_Carregamento_Lista", "")
                 data_carr = data_carr_raw.split(" ")[0].strip() if " " in data_carr_raw else data_carr_raw.strip()
@@ -809,6 +811,51 @@ def sincronizar_pasta_tms():
                 
                 lista_entrega = row.get("Lista_Entrega", "").strip()
                 ocorrencia = row.get("Ultima_Ocorrencia", "").strip()
+                rota = row.get("Rota_Entrega", "").strip()
+                placa = row.get("Placa_do_veiculo", row.get("Placa", "")).strip()
+
+                if pedido_id not in chamados_existentes:
+                    # Inserir novo cadastro no banco chamado
+                    novo_dict = {}
+                    for col in colunas_db:
+                        c_clean = col.replace("_", " ").lower()
+                        if "id do pedido" in c_clean or "id_pedido" in c_clean:
+                            novo_dict[col] = pedido_id
+                        elif "data do carregamento" in c_clean or "data_do_carregamento" in c_clean:
+                            novo_dict[col] = data_carr
+                        elif "motorista" in c_clean:
+                            novo_dict[col] = motorista
+                        elif "regional" in c_clean:
+                            novo_dict[col] = regional
+                        elif "rota" in c_clean:
+                            novo_dict[col] = rota
+                        elif "placa" in c_clean:
+                            novo_dict[col] = placa
+                        elif "descricao da divergencia" in c_clean or "descrição" in c_clean:
+                            novo_dict[col] = ocorrencia
+                        elif "lista entrega cruzada" in c_clean:
+                            novo_dict[col] = lista_entrega
+                        elif "status da tratativa" in c_clean or "status_da_tratativa" in c_clean:
+                            novo_dict[col] = "Em Andamento"
+                        elif "procedencia" in c_clean:
+                            novo_dict[col] = "Em Análise"
+                        elif "criado por" in c_clean or "criado_por" in c_clean:
+                            novo_dict[col] = "Carga TMS"
+                        else:
+                            novo_dict[col] = ""
+                    
+                    placeholders = ", ".join(["?"] * len(colunas_db))
+                    cols_str = ", ".join([f'"{c}"' for c in colunas_db])
+                    sql_ins = f'INSERT INTO chamados ({cols_str}) VALUES ({placeholders})'
+                    vals_ins = [novo_dict.get(c, "") for c in colunas_db]
+                    cursor.execute(sql_ins, vals_ins)
+                    
+                    chamados_existentes[pedido_id] = (novo_dict, {})
+                    total_novos += 1
+                    continue
+                    
+                # O pedido existe na base! Vamos atualizar campos que estiverem em branco.
+                chamado_dict, key_map = chamados_existentes[pedido_id]
                 
                 updates = {}
                 
@@ -842,21 +889,12 @@ def sincronizar_pasta_tms():
                     params = list(updates.values()) + [pedido_id]
                     cursor.execute(sql, params)
                     
-                    # Registrar histórico
-                    import datetime
-                    data_hora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    for k, v in updates.items():
-                        cursor.execute("""
-                            INSERT INTO historico_chamados (pedido_id, data_hora, usuario, campo, valor_antigo, valor_novo)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (pedido_id, data_hora, "Carga TMS", f"Atualizado: {k}", "", v))
-                        
-                    total_atualizados += 1
+                    total_novos += 1
                     for k, v in updates.items():
                         chamado_dict[k] = v
                         
     conn.commit()
-    return total_atualizados, total_lidos, None
+    return total_novos, total_lidos, None
 
 @app.route("/api/tms/sincronizar", methods=["POST"])
 @login_required
